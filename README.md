@@ -146,7 +146,7 @@ O domínio de produção é **https://ia.goodstyler.com/painel**. Na VPS que já
 ```sh
 sh scripts/preparar-vps.sh
 # Preencha OPENAI_API_KEY e BARBEARIA_API_TOKEN em .env.
-docker compose up -d --build
+docker compose -p luna-ia -f compose.yaml up -d --build
 sudo sh scripts/configurar-nginx.sh
 ```
 

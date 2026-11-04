@@ -25,6 +25,20 @@ Envie o projeto completo, incluindo `deploy/`, `scripts/`, `src/`, `public/`, `p
 
 ## Tokens e subida
 
+### Atualizar pelo Git
+
+Na VPS, entre no checkout do repositório da Luna e atualize a mesma branch enviada pelo computador:
+
+```sh
+cd /var/www/ia_barber
+git rev-parse --show-toplevel
+git pull --ff-only
+ls -l compose.yaml scripts/configurar-nginx.sh
+docker compose -p luna-ia -f /var/www/ia_barber/compose.yaml config --services
+```
+
+O caminho da raiz Git deve corresponder ao checkout da Luna, e a lista de serviços deve mostrar somente `luna`. Se a pasta ainda não é um clone da Luna, clone o repositório correto antes de continuar. Os arquivos `scripts/configurar-nginx.sh`, `compose.yaml` e `deploy/nginx-ia.goodstyler.com.conf` são versionados. `.env` é ignorado e deve ser criado/copiado diretamente na VPS; ele não chega por `git pull`. Envie os commits locais com `git push` antes de atualizar o servidor.
+
 Se já copiou seu `.env`, o preparador o preserva. Para criar um novo com as chaves internas geradas:
 
 ```sh
@@ -35,9 +49,9 @@ nano .env
 Preencha `OPENAI_API_KEY` e `BARBEARIA_API_TOKEN`. Este último precisa corresponder ao token aceito pelo PHP publicado (`BARBEARIA_IA_TOKEN`). `ADMIN_API_TOKEN` é a chave do painel. Preserve `DATA_ENCRYPTION_KEY` ao migrar um banco existente. A URL da API já está no modelo; não a substitua pelo domínio do painel.
 
 ```sh
-docker compose config --quiet
-docker compose up -d --build
-docker compose ps
+docker compose -p luna-ia -f compose.yaml config --quiet
+docker compose -p luna-ia -f compose.yaml up -d --build
+docker compose -p luna-ia -f compose.yaml ps
 curl --fail http://127.0.0.1:3308/healthz
 sudo sh scripts/configurar-nginx.sh
 ```
@@ -61,14 +75,28 @@ Abra **https://ia.goodstyler.com/painel**, entre com `ADMIN_API_TOKEN` e leia o 
 ## Atualização e dados
 
 ```sh
-docker compose logs --tail=80 luna
-docker compose exec luna node scripts/diagnose-site.js
-docker compose up -d --build
+docker compose -p luna-ia -f compose.yaml logs --tail=80 luna
+docker compose -p luna-ia -f compose.yaml exec luna node scripts/diagnose-site.js
+docker compose -p luna-ia -f compose.yaml up -d --build
 ```
 
 Depois de editar `.env`, use `up -d`; apenas `restart` não atualiza as variáveis. Se um Caddy deste mesmo projeto estava ativo de uma configuração anterior, pare somente ele com `docker compose stop caddy`. Não pare o Nginx que atende outros sites.
 
-O volume `luna_data` preserva sessão, ensinamentos e operações. Não execute `docker compose down -v`. Preserve o nome/pasta do projeto Compose e a chave de criptografia ao atualizar. Faça backup do volume e da chave. Os volumes Caddy antigos continuam declarados para preservação, mas não são usados no modo Nginx.
+O volume `luna_data` preserva sessão, ensinamentos e operações. Não execute `docker compose down -v`. Use sempre o mesmo projeto (`-p luna-ia`) e preserve a chave de criptografia ao atualizar. Se já havia uma Luna em outro nome de projeto, mantenha esse nome anterior para reutilizar o volume. Faça backup do volume e da chave. Os volumes Caddy antigos continuam declarados para preservação, mas não são usados no modo Nginx.
+
+## Se aparecer Essenza ou faltar o script
+
+Saída mencionando `www_default` e `essenza-postgres` não é a Luna. O Compose pode ter encontrado um arquivo numa pasta pai ou recebido `COMPOSE_FILE`/`COMPOSE_PROJECT_NAME` de outro projeto. O erro `cannot open scripts/configurar-nginx.sh` também indica que a cópia local do projeto na VPS está incompleta ou desatualizada.
+
+Envie/extraía o pacote completo na pasta `/var/www/ia_barber` e preserve o `.env` que já estiver lá. O pacote de distribuição não contém `.env`, dados ou chaves. Depois confira:
+
+```sh
+cd /var/www/ia_barber
+ls -l compose.yaml Dockerfile scripts/configurar-nginx.sh
+docker compose -p luna-ia -f /var/www/ia_barber/compose.yaml config --services
+```
+
+O último comando deve mostrar somente `luna`. Somente então execute `up -d --build` usando o mesmo `-p` e `-f`. Não execute `down` no Compose do Essenza para tentar corrigir a Luna.
 
 Para migrar o SQLite local, pare o bot local antes de copiar todos os arquivos do banco para o volume e mantenha a mesma chave. Um volume novo exige pareamento novamente. Execute uma única réplica por banco/sessão.
 
