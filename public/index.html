@@ -4,6 +4,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#20382e"><meta name="description" content="Seu atendimento, do seu jeito. Painel de controle da Luna.">
   <title>Luna · Central de atendimento</title><link rel="icon" href="/painel/icon.svg" type="image/svg+xml">
+  <link rel="preload" href="/painel/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/painel/style.css"><script type="module" src="/painel/app.js"></script>
 </head>
 <body>
@@ -34,11 +35,11 @@
   <div class="login-form-wrap"><form id="login-form" class="login-form">
     <span class="tag"><svg><use href="#i-lock"/></svg> ACESSO DO ADMINISTRADOR</span>
     <h2>Bom ter você aqui.</h2><p>Entre para cuidar do atendimento da sua barbearia.</p>
-    <label for="access-key">Chave de acesso</label><input id="access-key" type="password" autocomplete="current-password" required minlength="32" placeholder="Sua chave administrativa">
-    <p class="field-help">Use a chave <code>ADMIN_API_TOKEN</code> do seu arquivo .env.</p>
+    <label for="login-email">E-mail</label><input id="login-email" name="email" type="email" inputmode="email" autocomplete="username" required maxlength="254" placeholder="admin@admin" autocapitalize="none" spellcheck="false">
+    <label for="login-password">Senha</label><input id="login-password" name="password" type="password" autocomplete="current-password" required maxlength="256" placeholder="Sua senha">
     <p id="login-error" class="form-error" role="alert" hidden></p>
     <button class="button primary full" id="login-button" type="submit">Entrar no painel <svg><use href="#i-arrow"/></svg></button>
-    <div class="login-note"><svg><use href="#i-lock"/></svg><span>Acesso protegido. Sua chave não fica salva no navegador.</span></div>
+    <div class="login-note"><svg><use href="#i-lock"/></svg><span>Acesso protegido ao atendimento da sua barbearia.</span></div>
   </form><small class="login-footer">LUNA STUDIO <span>SEU ATENDIMENTO, DO SEU JEITO.</span></small></div>
 </section>
 
@@ -57,8 +58,18 @@
   <main>
     <div id="offline-banner" class="banner warning" role="status" hidden>Não foi possível atualizar. Confira sua conexão; os controles ficam indisponíveis até reconectar.</div>
     <section data-page="overview">
-      <div class="page-heading"><div><span class="eyebrow muted" id="today-label">SUA CENTRAL DE ATENDIMENTO</span><h1>Tudo sob controle<span class="accent">.</span></h1><p>Um olhar para o atendimento. Mais tempo para a barbearia.</p></div><a href="#teachings" class="button secondary"><svg><use href="#i-plus"/></svg>Ensinar a Luna</a></div>
-      <div class="hero"><div class="hero-copy"><span class="status-pill" id="hero-status">Verificando atendimento</span><h2 id="hero-title">Sua assistente.<br>Seu jeito de atender.</h2><p id="hero-description">Acompanhe o WhatsApp e deixe tudo pronto para receber seus clientes.</p><div class="hero-controls"><button class="button lime" data-toggle-bot disabled><svg><use href="#i-bolt"/></svg><span>Carregando...</span></button><a href="#connection" class="hero-link">Gerenciar conexão <span>↗</span></a></div></div><div class="hero-art" aria-hidden="true"><div class="hero-orbit"></div><div class="hero-orbit outer"></div><div class="luna-sphere">l<span>✦</span></div><div class="float-label upper">✦ Luna, sua assistente</div><div class="float-label lower"><span class="tiny-dot"></span>Conversa boa começa aqui</div></div></div>
+      <div class="page-heading control-heading"><div><span class="eyebrow muted" id="today-label">SUA CENTRAL DE ATENDIMENTO</span><h1>Seu atendimento<span class="accent">.</span></h1><p>Ligue, pause e escolha a hora de encerrar. Tudo por aqui.</p></div><span class="dashboard-label"><svg><use href="#i-settings"/></svg>CONTROLE DA LUNA</span></div>
+      <div class="operation-grid">
+        <article class="bot-console">
+          <div class="console-top"><div class="console-identity"><img src="/painel/icon.svg" width="46" height="46" alt=""><div><strong>Luna</strong><span>Assistente da sua barbearia</span></div></div><span class="console-state" id="control-badge">Verificando</span></div>
+          <div class="console-toggle-row"><div><h2 id="control-title">Atendimento automático</h2><p id="control-description">Consultando o estado da Luna...</p></div><button id="overview-bot-switch" class="switch switch-large" role="switch" aria-checked="false" aria-label="Ligar ou desligar a Luna" data-toggle-bot disabled><span></span></button></div>
+          <div class="console-footer"><span id="control-connection"><span class="tiny-dot"></span>Verificando WhatsApp</span><a href="#connection">Gerenciar conexão <svg><use href="#i-arrow"/></svg></a></div>
+        </article>
+        <article class="card schedule-card"><div class="schedule-heading"><span class="schedule-icon"><svg><use href="#i-clock"/></svg></span><div><h2>Pausa programada</h2><p>A Luna desliga no horário que você escolher.</p></div><span id="schedule-badge" class="badge">Opcional</span></div>
+          <form id="pause-form"><div class="schedule-fields"><div><label for="pause-time">Desligar às</label><input type="time" id="pause-time" value="19:00" required></div><div><label for="pause-repeat">Repetir</label><select id="pause-repeat"><option value="once">Só a próxima vez</option><option value="daily">Todos os dias</option></select></div></div><div class="schedule-buttons"><button class="button primary" id="save-pause" type="submit" disabled>Programar pausa</button><button class="button ghost" id="cancel-pause" type="button" hidden>Cancelar</button></div><p id="pause-error" class="form-error" role="alert" hidden></p></form>
+          <p id="schedule-summary" class="schedule-summary" aria-live="polite">Nenhuma pausa programada. Você controla pelo interruptor.</p><small id="schedule-timezone" class="schedule-timezone">Horário da barbearia</small>
+        </article>
+      </div>
       <div class="stats"><article class="stat-card"><div class="stat-top"><span>Conversas recentes</span><svg><use href="#i-chat"/></svg></div><strong id="count-conversations">—</strong><small id="conversation-window">No período de memória</small></article><article class="stat-card"><div class="stat-top"><span>Aguardando confirmação</span><svg><use href="#i-clock"/></svg></div><strong id="count-waiting">—</strong><small>Pedidos preparados, ainda sem reserva</small></article><article class="stat-card"><div class="stat-top"><span>Ensinamentos ativos</span><svg><use href="#i-book"/></svg></div><strong id="count-teachings">—</strong><small>O seu toque em cada conversa</small></article></div>
       <div id="uncertain-banner" class="banner warning" hidden></div>
       <div class="overview-bottom"><article class="card"><div class="card-heading"><h2>Conexões da Luna</h2><a href="#settings" class="text-link">Ver detalhes ↗</a></div><div class="integration-row"><span class="integration-icon whatsapp"><svg><use href="#i-chat"/></svg></span><div><strong>WhatsApp</strong><small>Seu canal de atendimento</small></div><span class="badge" id="overview-wa">Verificando</span></div><div class="integration-row"><span class="integration-icon"><svg><use href="#i-bolt"/></svg></span><div><strong>Inteligência artificial</strong><small>Respostas com o jeito da sua barbearia</small></div><span class="badge" id="overview-ai">Verificando</span></div><div class="integration-row"><span class="integration-icon sand"><svg><use href="#i-clock"/></svg></span><div><strong>Agenda da barbearia</strong><small>Serviços e horários do seu site</small></div><span class="badge" id="overview-site">Verificando</span></div></article>

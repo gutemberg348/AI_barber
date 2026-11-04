@@ -5,10 +5,12 @@ O painel acompanha o backend Node.js em **`/painel`**. Endereço padrão no comp
 ## Entrar e usar
 
 1. Reinicie o Node com `npm start`. No Docker, reconstrua a imagem para incluir `public/`.
-2. Abra `/painel` e use o valor de `ADMIN_API_TOKEN` do `.env` como chave de acesso. Não use a chave da OpenAI nem o token do site.
+2. Abra `/painel` e entre com e-mail e senha do `.env`: `ADMIN_EMAIL` e `ADMIN_PASSWORD`. Padrão solicitado: `admin@admin` / `admin`. Para mudar o acesso, altere esses campos e recrie o container com `docker compose -p luna-ia -f compose.yaml up -d --build luna`. `ADMIN_API_TOKEN` continua separado para a API.
 3. Em **WhatsApp**, clique em **Gerar QR Code**. No celular da barbearia, abra WhatsApp → Aparelhos conectados → Conectar um aparelho. Escaneie o QR em outra tela. A conexão e o QR são atualizados automaticamente; códigos expirados são ocultados.
 4. Em **Visão geral** ou **Configurações**, pause ou ative a Luna. Pausar interrompe novos envios automáticos; respostas já preparadas podem ser enviadas na retomada. Uma operação já enviada ao site pode terminar. Reservas existentes são preservadas.
 5. Em **Ensinamentos**, adicione título, categoria e orientação. É possível editar, excluir, pesquisar e ativar/desativar cada item. Somente ensinamentos ativos entram nas próximas chamadas da IA, sem reinício. Uma resposta já em processamento pode usar orientações anteriores.
+
+Na primeira tela, **Seu atendimento**, o interruptor liga/desliga a Luna. Em **Pausa programada**, escolha uma hora e se deve repetir só na próxima ocorrência ou todos os dias. O cálculo usa o fuso da barbearia mostrado na tela. Se a hora já passou, vale a próxima ocorrência. A programação fica no banco e funciona com o painel fechado; ao reiniciar o servidor, uma pausa vencida é aplicada. A pausa não religa a Luna sozinha: use o interruptor. Cancelar a programação não altera o estado atual. Operações já enviadas ao site podem terminar. O painel usa Inter hospedada no próprio servidor, sem buscar fontes externas no navegador.
 
 Os ensinamentos ficam no SQLite criptografado do projeto. Limites: 30 itens, 1.500 caracteres por orientação e 18.000 no total. Duas abas não podem sobrescrever silenciosamente alterações: um conflito exige conferir a lista atualizada antes de salvar novamente. Os ensinamentos complementam o atendimento; catálogo, preços, vagas e reservas continuam vindo do site. As regras de confirmação do backend continuam obrigatórias.
 
@@ -39,7 +41,7 @@ Para testar na rede local, configure `HOST` para a interface de rede apropriada 
 
 ## Acesso e endpoints
 
-Login: `POST /api/v1/panel/session` com `Authorization: Bearer <ADMIN_API_TOKEN>`. Cria sessão de 8 horas em cookie HttpOnly e SameSite=Strict. A chave não vai para localStorage, URL ou arquivos públicos. Sair invalida a sessão; reiniciar o Node invalida todas as sessões do painel. A API continua aceitando Bearer para integrações existentes.
+Login: `POST /api/v1/panel/session` com JSON `{"email":"admin@admin","password":"admin"}`, usando os valores configurados em `ADMIN_EMAIL` e `ADMIN_PASSWORD`. O login aceita até 8 tentativas por minuto e cria sessão de 8 horas em cookie HttpOnly e SameSite=Strict. A aplicação não grava senha em localStorage, URL ou arquivos públicos. Sair invalida a sessão; reiniciar o Node invalida todas as sessões do painel. A API continua aceitando Bearer para integrações existentes, inclusive o login legado com `ADMIN_API_TOKEN`.
 
 | Método | Caminho | Uso |
 | --- | --- | --- |
@@ -52,4 +54,4 @@ Somente login e assets são públicos. Dados, QR e controles exigem sessão ou B
 
 ## Prévia isolada para desenvolvimento
 
-`node scripts/preview-panel.js` abre **http://127.0.0.1:3467/painel** com banco em memória, sem clientes, IA ou WhatsApp reais. Chave fictícia exclusivamente dessa prévia: `luna-preview-local-only-1234567890`. O QR dela é ilustrativo e não conecta ao WhatsApp. Não publique essa prévia. Use `npm start` para o painel real.
+`node scripts/preview-panel.js` abre **http://127.0.0.1:3467/painel** com banco em memória, sem clientes, IA ou WhatsApp reais. Login: `admin@admin` / `admin`. O QR dela é ilustrativo e não conecta ao WhatsApp. Não publique essa prévia. Use `npm start` para o painel real.

@@ -2,7 +2,7 @@
 
 Backend Node.js com Baileys e OpenAI Responses API. A Luna consulta o site da barbearia, apresenta serviços e horários, prepara agendamentos/cancelamentos e só grava após confirmação explícita do cliente no WhatsApp.
 
-**Painel Luna Studio:** após iniciar/reiniciar o Node, abra [http://localhost:3000/painel](http://localhost:3000/painel) e entre com `ADMIN_API_TOKEN`. Painel responsivo com QR Code, status, ativação/pausa, ensinamentos editáveis e verificação da integração. Os ensinamentos são persistidos e aplicados sem reiniciar. [Acesso online e instruções do painel](docs/PAINEL.md).
+**Painel Luna Studio:** após iniciar/reiniciar o Node, abra [http://localhost:3000/painel](http://localhost:3000/painel) e entre com `ADMIN_EMAIL` e `ADMIN_PASSWORD` do `.env` (padrão: `admin@admin` / `admin`). Painel responsivo com QR Code, status, ativação/pausa, ensinamentos editáveis e verificação da integração. Os ensinamentos são persistidos e aplicados sem reiniciar. [Acesso online e instruções do painel](docs/PAINEL.md).
 
 Implementa o contrato existente em [docs/API_IA.md](docs/API_IA.md) e [docs/openapi-ia.json](docs/openapi-ia.json). A agenda e seus preços continuam no site. O SQLite deste serviço guarda sessão WhatsApp, histórico curto, confirmações e respostas pendentes.
 

@@ -7,6 +7,8 @@ const schema = z.object({
   HOST: z.string().default('127.0.0.1'),
   PORT: integer(3000, 1, 65535),
   ADMIN_API_TOKEN: z.string().min(32).regex(/^\S+$/),
+  ADMIN_EMAIL: z.string().trim().toLowerCase().min(3).max(254).regex(/^[^\s@]+@[^\s@]+$/).default('admin@admin'),
+  ADMIN_PASSWORD: z.string().min(1).max(256).default('admin'),
   DATA_ENCRYPTION_KEY: z.string().regex(/^[a-fA-F0-9]{64}$/),
   DATABASE_PATH: z.string().default('./data/luna.sqlite'),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent']).default('info'),

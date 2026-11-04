@@ -46,7 +46,7 @@ sh scripts/preparar-vps.sh
 nano .env
 ```
 
-Preencha `OPENAI_API_KEY` e `BARBEARIA_API_TOKEN`. Este último precisa corresponder ao token aceito pelo PHP publicado (`BARBEARIA_IA_TOKEN`). `ADMIN_API_TOKEN` é a chave do painel. Preserve `DATA_ENCRYPTION_KEY` ao migrar um banco existente. A URL da API já está no modelo; não a substitua pelo domínio do painel.
+Preencha `OPENAI_API_KEY` e `BARBEARIA_API_TOKEN`. Este último precisa corresponder ao token aceito pelo PHP publicado (`BARBEARIA_IA_TOKEN`). O login do painel é configurado por `ADMIN_EMAIL=admin@admin` e `ADMIN_PASSWORD=admin`; adicione esses campos ao `.env` existente ou altere para os valores desejados. `ADMIN_API_TOKEN` continua para integrações da API. Preserve `DATA_ENCRYPTION_KEY` ao migrar um banco existente. A URL da API já está no modelo; não a substitua pelo domínio do painel.
 
 ```sh
 docker compose -p luna-ia -f compose.yaml config --quiet
@@ -70,7 +70,7 @@ sudo certbot renew --dry-run
 
 Confira se a instalação do Certbot tem timer/tarefa de renovação habilitado. Se o domínio já existe em outro arquivo Nginx, ajuste nele `proxy_pass http://127.0.0.1:3308;`, preservando o SSL existente. O modelo completo está em `deploy/nginx-ia.goodstyler.com.conf`.
 
-Abra **https://ia.goodstyler.com/painel**, entre com `ADMIN_API_TOKEN` e leia o QR na tela WhatsApp. O login de produção exige HTTPS; o endereço HTTP local serve para diagnóstico. O Compose desativa a impressão do QR nos logs.
+Abra **https://ia.goodstyler.com/painel**, entre com `ADMIN_EMAIL` e `ADMIN_PASSWORD` e leia o QR na tela WhatsApp. O login de produção exige HTTPS; o endereço HTTP local serve para diagnóstico. O Compose desativa a impressão do QR nos logs.
 
 ## Atualização e dados
 

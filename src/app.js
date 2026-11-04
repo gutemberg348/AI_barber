@@ -4,6 +4,7 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { integrationStatus } from './config.js';
 import { panelSessions, publicPanelRoutes, registerPanel } from './panel.js';
+import { applyScheduledPause, botEnabled, savePauseSettings } from './bot-control.js';
 
 const digest = text => createHash('sha256').update(text).digest();
 
@@ -16,18 +17,23 @@ export async function buildApp({ config, whatsapp, api, store, logger }) {
   } } });
   await app.register(rateLimit, { max: 120, timeWindow: '1 minute' });
   const sessions = panelSessions(config);
+  const pauseTimer = setInterval(() => {
+    try { applyScheduledPause(store, config.BARBEARIA_TIMEZONE); }
+    catch { logger.error({ event: 'scheduled_pause_failed' }, 'Falha ao aplicar pausa programada'); }
+  }, 1000);
+  pauseTimer.unref();
+  app.addHook('onClose', async () => clearInterval(pauseTimer));
   app.addHook('onRequest', async (request, reply) => {
     reply.header('Cache-Control', 'no-store');
     if (request.routeOptions.url === '/healthz' || publicPanelRoutes.has(request.routeOptions.url)) return;
+    // A rota de login valida e-mail/senha (ou Bearer legado) no próprio handler.
+    if (request.routeOptions.url === '/api/v1/panel/session' && request.method === 'POST') return;
     const expected = `Bearer ${config.ADMIN_API_TOKEN}`;
     const supplied = request.headers.authorization ?? '';
     if (timingSafeEqual(digest(supplied), digest(expected))) return;
-    // A chave administrativa só entra no login. As demais chamadas usam cookie HttpOnly.
-    if (request.routeOptions.url !== '/api/v1/panel/session' || request.method !== 'POST') {
-      if (sessions.valid(request)) {
-        if (!['GET', 'HEAD'].includes(request.method) && request.headers['x-luna-panel'] !== '1') return reply.code(403).send({ error: 'origem_invalida' });
-        return;
-      }
+    if (sessions.valid(request)) {
+      if (!['GET', 'HEAD'].includes(request.method) && request.headers['x-luna-panel'] !== '1') return reply.code(403).send({ error: 'origem_invalida' });
+      return;
     }
     return reply.code(401).send({ error: 'nao_autorizado' });
   });
@@ -39,7 +45,7 @@ export async function buildApp({ config, whatsapp, api, store, logger }) {
   app.get('/healthz', async () => ({ status: 'ok' }));
   const fullStatus = () => {
     const integration = integrationStatus(config);
-    const connection = whatsapp.status();
+    const connection = { ...whatsapp.status(), botEnabled: botEnabled(store, config.BARBEARIA_TIMEZONE) };
     return { ...connection, ...integration,
       ready: connection.connected && connection.botEnabled && integration.openaiConfigured && integration.barbershopConfigured,
       readinessScope: 'connection_and_configuration',
@@ -67,8 +73,16 @@ export async function buildApp({ config, whatsapp, api, store, logger }) {
   app.put('/api/v1/bot', {
     schema: { body: { type: 'object', properties: { enabled: { type: 'boolean' } }, required: ['enabled'], additionalProperties: false } },
   }, async request => {
+    applyScheduledPause(store, config.BARBEARIA_TIMEZONE);
     store.set('system', 'bot-enabled', request.body.enabled);
     return fullStatus();
+  });
+  app.put('/api/v1/bot/schedule', {
+    schema: { body: { type: 'object', required: ['enabled', 'time', 'repeat'], additionalProperties: false,
+      properties: { enabled: { type: 'boolean' }, time: { type: 'string', pattern: '^(?:[01][0-9]|2[0-3]):[0-5][0-9]$' }, repeat: { type: 'string', enum: ['once', 'daily'] } } } },
+  }, async request => {
+    const schedule = savePauseSettings(store, request.body, config.BARBEARIA_TIMEZONE);
+    return { schedule, status: fullStatus(), timezone: config.BARBEARIA_TIMEZONE };
   });
   app.get('/api/v1/integrations', async () => ({
     ...integrationStatus(config), model: config.OPENAI_MODEL, barbershop: config.BARBEARIA_NOME,

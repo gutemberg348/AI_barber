@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
+import { pauseSettings } from './bot-control.js';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 const lessonSchema = z.object({
@@ -12,7 +13,7 @@ const knowledgeSchema = z.object({ revision: z.number().int().nonnegative(), les
   .refine(value => new Set(value.lessons.map(item => item.id)).size === value.lessons.length)
   .refine(value => value.lessons.reduce((total, item) => total + item.content.length, 0) <= 18000);
 
-export const publicPanelRoutes = new Set(['/', '/painel', '/painel/', '/painel/app.js', '/painel/style.css', '/painel/icon.svg']);
+export const publicPanelRoutes = new Set(['/', '/painel', '/painel/', '/painel/app.js', '/painel/style.css', '/painel/icon.svg', '/painel/fonts/InterVariable.woff2']);
 export const knowledge = store => store.get('system', 'knowledge') ?? { revision: 0, lessons: [], updatedAt: null };
 
 export function knowledgeInstructions(store) {
@@ -53,11 +54,18 @@ export async function registerPanel(app, { config, store, fullStatus, sessions }
   for (const [url, file, type] of [
     ['/', 'index.html', 'text/html'], ['/painel', 'index.html', 'text/html'], ['/painel/', 'index.html', 'text/html'],
     ['/painel/app.js', 'app.js', 'text/javascript'], ['/painel/style.css', 'style.css', 'text/css'], ['/painel/icon.svg', 'icon.svg', 'image/svg+xml'],
+    ['/painel/fonts/InterVariable.woff2', 'fonts/InterVariable.woff2', 'font/woff2'],
   ]) {
     const contents = await readFile(new URL(`../public/${file}`, import.meta.url));
     app.get(url, async (request, reply) => reply.type(`${type}; charset=utf-8`).send(contents));
   }
   app.post('/api/v1/panel/session', { config: { rateLimit: { max: 8, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const credentials = z.object({ email: z.string().trim().toLowerCase().max(254), password: z.string().max(256) }).strict().safeParse(request.body);
+    const equal = (left, right) => timingSafeEqual(Buffer.from(hash(left), 'hex'), Buffer.from(hash(right), 'hex'));
+    const emailOk = equal(credentials.success ? credentials.data.email : '', config.ADMIN_EMAIL);
+    const passwordOk = equal(credentials.success ? credentials.data.password : '', config.ADMIN_PASSWORD);
+    const bearerOk = equal(request.headers.authorization ?? '', `Bearer ${config.ADMIN_API_TOKEN}`);
+    if (!(credentials.success && emailOk && passwordOk) && !bearerOk) return reply.code(401).send({ error: 'nao_autorizado' });
     sessions.create(reply);
     return { ok: true };
   });
@@ -70,7 +78,7 @@ export async function registerPanel(app, { config, store, fullStatus, sessions }
     const pending = store.entries('pending');
     const saved = knowledge(store);
     return {
-      status: fullStatus(), barbershop: config.BARBEARIA_NOME, owner: config.BARBEARIA_DONO,
+      status: fullStatus(), schedule: pauseSettings(store), barbershop: config.BARBEARIA_NOME, owner: config.BARBEARIA_DONO,
       timezone: config.BARBEARIA_TIMEZONE, model: config.OPENAI_MODEL, siteUrl: config.BARBEARIA_SITE_URL,
       historyHours: config.HISTORY_TTL_HOURS,
       counts: { conversations: histories.length, waiting: pending.filter(item => item.state === 'prepared').length,

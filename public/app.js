@@ -6,6 +6,7 @@ const stateNames = { connected: 'Conectado', qr: 'Aguardando leitura', connectin
 let authenticated = false, overview = null, teachings = { revision: 0, lessons: [] }, editingId = null;
 let pollTimer, toastTimer, qrExpiry = 0, fetching = false, mutating = false, fresh = false, sessionEpoch = 0;
 let currentPage = 'overview';
+let scheduleDirty = false;
 
 function toast(message, error = false) {
   clearTimeout(toastTimer); $('#toast').textContent = message; $('#toast').classList.toggle('error', error); $('#toast').hidden = false;
@@ -13,10 +14,11 @@ function toast(message, error = false) {
 }
 function resetQr() { qrExpiry = 0; $('#qr-image').hidden = true; $('#qr-image').removeAttribute('src'); $('#qr-placeholder').hidden = false; }
 function showLogin() {
+  scheduleDirty = false;
   authenticated = false; sessionEpoch++; fresh = false; overview = null; clearTimeout(pollTimer); resetQr();
   teachings = { revision: 0, lessons: [] }; $('#lesson-list').replaceChildren();
   $$('dialog[open]').forEach(dialog => dialog.close());
-  $('#workspace').hidden = true; $('#login-screen').hidden = false; $('#access-key').value = '';
+  $('#workspace').hidden = true; $('#login-screen').hidden = false; $('#login-password').value = '';
 }
 async function api(path, options = {}) {
   const { key, ...rest } = options;
@@ -28,7 +30,7 @@ async function api(path, options = {}) {
     const data = await response.json();
     if (!response.ok) {
       if (response.status === 401 && authenticated) { showLogin(); toast('Sua sessão terminou. Entre novamente.'); }
-      const messages = { 401: 'Chave de acesso inválida. Confira e tente novamente.', 409: 'Os ensinamentos mudaram em outra sessão. A lista foi atualizada; confira antes de salvar novamente.', 429: 'Muitas tentativas. Aguarde um minuto e tente novamente.', 400: 'Confira os campos. Use até 30 ensinamentos e 18.000 caracteres no total.' };
+      const messages = { 401: 'E-mail ou senha inválidos. Confira e tente novamente.', 409: 'Os ensinamentos mudaram em outra sessão. A lista foi atualizada; confira antes de salvar novamente.', 429: 'Muitas tentativas. Aguarde um minuto e tente novamente.', 400: 'Confira os campos. Use até 30 ensinamentos e 18.000 caracteres no total.' };
       throw Object.assign(new Error(messages[response.status] ?? 'Não foi possível concluir. Tente novamente em instantes.'), { status: response.status, code: data.error });
     }
     return data;
@@ -51,12 +53,14 @@ function renderStatus() {
   $('#count-waiting').textContent = overview.counts.waiting;
   $('#count-teachings').textContent = overview.counts.teachings;
   $('#conversation-window').textContent = `Conversas nas últimas ${overview.historyHours} horas`;
-  $('#hero-status').textContent = !fresh ? 'Sem atualização' : s.ready ? 'Pronta para atender' : !s.botEnabled ? 'Atendimento pausado' : 'Preparando o atendimento';
-  $('#hero-title').textContent = s.ready ? 'A Luna cuida das conversas. Você cuida dos clientes.' : !s.botEnabled ? 'Uma pausa, no seu tempo.' : 'Sua assistente. Seu jeito de atender.';
-  $('#hero-description').textContent = !fresh ? 'Aguardando uma nova atualização do servidor.' : !s.botEnabled ? 'Ative quando quiser retomar as respostas automáticas.' : !s.connected ? 'Conecte o WhatsApp para a Luna receber seus clientes.' : !s.openaiConfigured || !s.barbershopConfigured ? 'Confira as integrações para completar a configuração.' : 'WhatsApp conectado e integrações configuradas. Tudo pronto para boas conversas.';
-  const heroToggle = $('[data-toggle-bot] span'); heroToggle.textContent = s.botEnabled ? 'Pausar a Luna' : 'Ativar a Luna';
-  $('#bot-switch').setAttribute('aria-checked', String(s.botEnabled));
-  $$('[data-toggle-bot]').forEach(button => { button.disabled = mutating || !fresh; });
+  $('#control-badge').textContent = !fresh ? 'Sem atualização' : s.botEnabled ? 'Ligada' : 'Desligada';
+  $('#control-badge').classList.toggle('is-on', fresh && s.botEnabled);
+  $('.bot-console').classList.toggle('is-off', !s.botEnabled);
+  $('#control-title').textContent = s.botEnabled ? 'Luna ligada' : 'Luna desligada';
+  $('#control-description').textContent = !fresh ? 'Aguardando atualização do servidor.' : !s.botEnabled ? 'As respostas automáticas estão pausadas. Ligue quando quiser.' : !s.connected ? 'Atendimento ativado. Conecte o WhatsApp para começar.' : !s.openaiConfigured || !s.barbershopConfigured ? 'Atendimento ativado. Confira as integrações para começar.' : 'Respondendo seus clientes automaticamente.';
+  const connection = $('#control-connection'); connection.replaceChildren(node('span', `tiny-dot${s.connected ? ' connected' : ''}`), document.createTextNode(fresh ? `WhatsApp ${s.connected ? 'conectado' : 'desconectado'}` : 'Aguardando conexão'));
+  $$('[data-toggle-bot]').forEach(button => { button.disabled = mutating || !fresh; button.setAttribute('aria-checked', String(s.botEnabled)); });
+  renderSchedule();
   badge('#overview-wa', fresh ? stateNames[s.state] ?? 'Verificando' : 'Sem atualização', fresh && s.connected, fresh && !s.connected);
   badge('#overview-ai', s.openaiConfigured ? 'Configurada' : 'Configurar', s.openaiConfigured, !s.openaiConfigured);
   badge('#overview-site', s.barbershopConfigured ? 'Configurada' : 'Configurar', s.barbershopConfigured, !s.barbershopConfigured);
@@ -74,6 +78,19 @@ function renderStatus() {
   $('#qr-description').textContent = !fresh ? 'O QR foi ocultado. Aguarde a reconexão ao painel.' : s.connected ? 'O WhatsApp está vinculado. Você pode controlar a Luna pela visão geral.' : s.state === 'error' ? 'Verifique os aparelhos conectados no WhatsApp e tente conectar novamente.' : ['connecting', 'reconnecting', 'qr'].includes(s.state) ? 'O QR aparecerá assim que estiver disponível.' : 'Gere o QR Code para vincular o WhatsApp da barbearia.';
   if (!fresh || s.connected || !s.qrAvailable) resetQr();
   if (!qrExpiry) $('#qr-expiry').textContent = s.connected ? 'Conexão confirmada pelo WhatsApp.' : 'O QR Code aparece aqui e se atualiza automaticamente.';
+}
+function renderSchedule() {
+  const schedule = overview.schedule ?? { enabled: false, time: '19:00', repeat: 'once' };
+  if (!scheduleDirty) { $('#pause-time').value = schedule.time; $('#pause-repeat').value = schedule.repeat; }
+  $('#save-pause').disabled = mutating || !fresh;
+  $('#save-pause').textContent = schedule.enabled ? 'Salvar horário' : 'Programar pausa';
+  $('#cancel-pause').hidden = !schedule.enabled; $('#cancel-pause').disabled = mutating || !fresh;
+  badge('#schedule-badge', schedule.enabled ? 'Programada' : 'Opcional', schedule.enabled);
+  const dateLabel = value => new Intl.DateTimeFormat('pt-BR', { timeZone: overview.timezone, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+  $('#schedule-summary').textContent = schedule.enabled && schedule.nextPauseAt
+    ? `Próxima pausa: ${dateLabel(schedule.nextPauseAt)}.${schedule.repeat === 'daily' ? ' Repete todos os dias. Você religa pelo interruptor.' : ' Depois, você religa pelo interruptor.'}`
+    : schedule.lastPausedAt ? `Última pausa automática: ${dateLabel(schedule.lastPausedAt)}. Você pode ligar novamente pelo interruptor.` : 'Nenhuma pausa programada. Você controla pelo interruptor.';
+  $('#schedule-timezone').textContent = `Horário da barbearia · ${overview.timezone}`;
 }
 async function refresh() {
   if (!authenticated || fetching) return;
@@ -159,12 +176,17 @@ function confirmAction(title, description, label) {
 async function mutate(action, success) {
   if (mutating || !fresh) return;
   mutating = true; renderStatus();
-  try { await action(); toast(success); await refresh(); }
+  try {
+    const result = await action();
+    if (overview && typeof result?.botEnabled === 'boolean') overview.status = result;
+    if (overview && result?.schedule) { overview.schedule = result.schedule; overview.status = result.status; }
+    toast(success); await refresh();
+  }
   catch (error) { toast(error.message, true); }
   finally { mutating = false; renderStatus(); }
 }
 async function logout() {
-  try { await api('panel/session', { method: 'DELETE' }); showLogin(); $('#access-key').focus(); }
+  try { await api('panel/session', { method: 'DELETE' }); showLogin(); $('#login-email').focus(); }
   catch (error) { toast(error.message, true); }
 }
 async function enter() {
@@ -173,12 +195,28 @@ async function enter() {
 }
 $('#login-form').addEventListener('submit', async event => {
   event.preventDefault(); $('#login-error').hidden = true; $('#login-button').disabled = true;
-  const key = $('#access-key').value.trim(); $('#access-key').value = '';
-  try { await api('panel/session', { method: 'POST', key, body: '{}' }); await enter(); }
+  const email = $('#login-email').value.trim(); const password = $('#login-password').value; $('#login-password').value = '';
+  try { await api('panel/session', { method: 'POST', body: JSON.stringify({ email, password }) }); await enter(); }
   catch (error) { $('#login-error').textContent = error.message; $('#login-error').hidden = false; }
   finally { $('#login-button').disabled = false; }
 });
 $$('[data-toggle-bot]').forEach(button => button.addEventListener('click', () => void mutate(() => api('bot', { method: 'PUT', body: JSON.stringify({ enabled: !overview.status.botEnabled }) }), overview.status.botEnabled ? 'Luna pausada.' : 'Luna ativada.')));
+$('#pause-time').addEventListener('input', () => { scheduleDirty = true; });
+$('#pause-repeat').addEventListener('change', () => { scheduleDirty = true; });
+$('#pause-form').addEventListener('submit', async event => {
+  event.preventDefault(); if (mutating || !fresh) return;
+  $('#pause-error').hidden = true; mutating = true; renderStatus();
+  try {
+    const result = await api('bot/schedule', { method: 'PUT', body: JSON.stringify({ enabled: true, time: $('#pause-time').value, repeat: $('#pause-repeat').value }) });
+    overview.schedule = result.schedule; overview.status = result.status; scheduleDirty = false;
+    toast('Pausa programada. Funciona mesmo com o painel fechado.');
+  } catch (error) { $('#pause-error').textContent = error.status === 400 ? 'Escolha um horário válido para a pausa.' : error.message; $('#pause-error').hidden = false; }
+  finally { mutating = false; renderStatus(); }
+});
+$('#cancel-pause').addEventListener('click', () => void mutate(async () => {
+  const result = await api('bot/schedule', { method: 'PUT', body: JSON.stringify({ enabled: false, time: overview.schedule.time, repeat: overview.schedule.repeat }) });
+  scheduleDirty = false; return result;
+}, 'Pausa programada cancelada.'));
 $$('[data-wa]').forEach(button => button.addEventListener('click', async () => {
   const action = button.dataset.wa;
   if (action === 'disconnect' && !await confirmAction('Desconectar WhatsApp?', 'A Luna ficará sem conexão. Você pode reconectar depois, preservando o vínculo.', 'Desconectar')) return;

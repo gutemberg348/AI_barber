@@ -8,8 +8,8 @@ import { MessageProcessor } from '../src/messages.js';
 import { config, logger, memoryStore, fakeApi, phone, idle } from './helpers.js';
 
 const lesson = { id: '12345678-1234-4234-8234-123456789012', title: 'Como chegar', content: 'Estamos ao lado da praça.', category: 'informacoes', enabled: true };
-async function setup(t) {
-  const store = memoryStore(); const c = config();
+async function setup(t, extra = {}) {
+  const store = memoryStore(); const c = config(extra);
   const whatsapp = { status: () => ({ state: 'connected', connected: true, botEnabled: store.get('system', 'bot-enabled') !== false }), qrCode: async () => ({ qr: 'private-qr', qrDataUrl: 'data:image/png;base64,AA==', expiresAt: new Date().toISOString() }), connect() {}, disconnect() {}, logout() {} };
   const app = await buildApp({ config: c, store, whatsapp, logger, api: fakeApi() });
   t.after(async () => { await app.close(); store.close(); });
@@ -38,6 +38,33 @@ test('login usa cookie HttpOnly; mutação exige cabeçalho e logout invalida se
   assert.equal(paused.json().botEnabled, false); assert.equal(store.get('system', 'bot-enabled'), false);
   assert.equal((await app.inject({ method: 'DELETE', url: '/api/v1/panel/session', headers: auth })).statusCode, 200);
   assert.equal((await app.inject({ url: '/api/v1/panel/overview', headers: auth })).statusCode, 401);
+});
+test('login por email/senha usa valores do env, rejeita inválidos e protege a API', async t => {
+  const { app, c } = await setup(t, { ADMIN_EMAIL: 'dono@barbearia', ADMIN_PASSWORD: 'senha-de-teste' });
+  const url = '/api/v1/panel/session';
+  for (const payload of [
+    {}, { email: 'admin@admin', password: 'admin' },
+    { email: c.ADMIN_EMAIL, password: 'errada' },
+    { email: 'outro@barbearia', password: c.ADMIN_PASSWORD },
+    { email: c.ADMIN_EMAIL, password: c.ADMIN_PASSWORD, extra: true },
+  ]) {
+    const denied = await app.inject({ method: 'POST', url, payload });
+    assert.equal(denied.statusCode, 401); assert.equal(denied.headers['set-cookie'], undefined);
+    assert.doesNotMatch(denied.body, /senha-de-teste|dono@barbearia/);
+  }
+  const login = await app.inject({ method: 'POST', url, payload: { email: ' DONO@BARBEARIA ', password: c.ADMIN_PASSWORD } });
+  assert.equal(login.statusCode, 200); assert.match(login.headers['set-cookie'], /HttpOnly/);
+  const cookie = login.headers['set-cookie'].split(';')[0];
+  assert.equal((await app.inject({ url: '/api/v1/panel/overview', headers: { cookie } })).statusCode, 200);
+  assert.equal((await app.inject({ url: '/api/v1/panel/overview', headers: { authorization: `Bearer ${c.ADMIN_PASSWORD}` } })).statusCode, 401);
+});
+test('login padrão admin@admin/admin funciona e tentativas incorretas são limitadas', async t => {
+  const { app } = await setup(t);
+  const url = '/api/v1/panel/session';
+  const login = await app.inject({ method: 'POST', url, payload: { email: 'admin@admin', password: 'admin' } });
+  assert.equal(login.statusCode, 200);
+  for (let count = 0; count < 7; count++) assert.equal((await app.inject({ method: 'POST', url, payload: { email: 'admin@admin', password: 'errada' } })).statusCode, 401);
+  assert.equal((await app.inject({ method: 'POST', url, payload: { email: 'admin@admin', password: 'errada' } })).statusCode, 429);
 });
 test('cookie de produção exige HTTPS e sessão expirada é recusada', () => {
   const sessions = panelSessions({ NODE_ENV: 'production' }); let cookie;

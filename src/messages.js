@@ -1,4 +1,5 @@
 import { jidNormalizedUser, normalizeMessageContent } from '@whiskeysockets/baileys';
+import { botEnabled } from './bot-control.js';
 
 export function phoneFromJid(jid) {
   if (!jid || !jid.endsWith('@s.whatsapp.net')) return null;
@@ -120,7 +121,7 @@ export class MessageProcessor {
   async process(item) {
     if (item.state !== 'reply_ready') {
       const command = item.text.trim().toLowerCase();
-      if (this.store.get('system', 'bot-enabled') === false || (item.phone && this.store.get('paused', item.phone) && !['/voltar', '/parar', '/iniciar'].includes(command))) {
+      if (!botEnabled(this.store, this.config.BARBEARIA_TIMEZONE) || (item.phone && this.store.get('paused', item.phone) && !['/voltar', '/parar', '/iniciar'].includes(command))) {
         item.state = 'ignored';
         this.finish(item);
         return;
@@ -140,7 +141,7 @@ export class MessageProcessor {
         } else if (command === '/voltar') {
           this.store.delete('paused', item.phone);
           item.reply = 'Voltei! Como posso ajudar? 💈';
-        } else if (this.store.get('paused', item.phone) || this.store.get('system', 'bot-enabled') === false) {
+        } else if (this.store.get('paused', item.phone) || !botEnabled(this.store, this.config.BARBEARIA_TIMEZONE)) {
           item.state = 'ignored';
           this.finish(item);
           return;
@@ -171,7 +172,7 @@ export class MessageProcessor {
         });
       });
     }
-    if (!this.running || !this.send || this.store.get('system', 'bot-enabled') === false) return;
+    if (!this.running || !this.send || !botEnabled(this.store, this.config.BARBEARIA_TIMEZONE)) return;
     // Uma grade enfileirada pode ter mudado durante a queda da conexão.
     // Reconsultar apenas disponibilidade: nunca reexecutar o agendamento.
     if (item.scheduleQuery && (item.sendAttempted || Date.now() - (item.replyGeneratedAt ?? 0) > 30000)) {
@@ -185,7 +186,7 @@ export class MessageProcessor {
         this.luna.replaceHistoricalReply(item.phone, previous, item.reply);
       });
     }
-    if (!this.running || !this.send || this.store.get('system', 'bot-enabled') === false) return;
+    if (!this.running || !this.send || !botEnabled(this.store, this.config.BARBEARIA_TIMEZONE)) return;
     try {
       item.sendAttempted = true;
       this.store.set('inbound', item.id, item);

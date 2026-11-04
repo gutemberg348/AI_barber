@@ -13,7 +13,7 @@ import { buildApp } from './app.js';
 
 async function main() {
   const config = loadConfig();
-  const logger = pino({ level: config.LOG_LEVEL, redact: ['req.headers.authorization', 'token', 'apiKey', 'qr'] });
+  const logger = pino({ level: config.LOG_LEVEL, redact: ['req.headers.authorization', 'token', 'apiKey', 'qr', 'password', 'req.body.password'] });
   await mkdir(dirname(config.DATABASE_PATH), { recursive: true, mode: 0o700 });
   const release = await lockfile.lock(config.DATABASE_PATH, { realpath: false, retries: 0 });
   let store, whatsapp, app, processor, retryTimer, pruneTimer;
