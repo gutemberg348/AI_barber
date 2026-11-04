@@ -1,0 +1,7 @@
+# Painel, API de controle e WhatsApp no mesmo backend Node.
+# O DNS de ia.goodstyler.com deve apontar para o IP desta VPS.
+# Alternativa opcional: perfil caddy. Não usar junto do Nginx nas mesmas portas.
+ia.goodstyler.com {
+	encode zstd gzip
+	reverse_proxy luna:3000
+}

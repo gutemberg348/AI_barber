@@ -1,0 +1,53 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Luna — controle do WhatsApp", "version": "1.0.0", "description": "API administrativa servidor-a-servidor. Nunca colocar o Bearer token no frontend. ready verifica configuração e conexão, não credenciais externas." },
+  "servers": [{ "url": "http://127.0.0.1:3000" }],
+  "security": [{ "bearerAuth": [] }],
+  "components": {
+    "securitySchemes": { "bearerAuth": { "type": "http", "scheme": "bearer" } },
+    "schemas": {
+      "Status": {
+        "type": "object",
+        "properties": {
+          "state": { "type": "string", "enum": ["disconnected", "connecting", "qr", "connected", "reconnecting", "logged_out", "error"] },
+          "connected": { "type": "boolean" },
+          "qrAvailable": { "type": "boolean" },
+          "qrExpiresAt": { "type": "string", "format": "date-time", "nullable": true },
+          "connectedAt": { "type": "string", "format": "date-time", "nullable": true },
+          "changedAt": { "type": "string", "format": "date-time" },
+          "lastDisconnectCode": { "type": "integer", "nullable": true },
+          "botEnabled": { "type": "boolean" },
+          "openaiConfigured": { "type": "boolean" },
+          "barbershopConfigured": { "type": "boolean" },
+          "ready": { "type": "boolean" },
+          "readinessScope": { "type": "string" }
+        }
+      },
+      "Qr": {
+        "type": "object", "required": ["qr", "qrDataUrl", "expiresAt", "state"],
+        "properties": { "qr": { "type": "string" }, "qrDataUrl": { "type": "string" }, "expiresAt": { "type": "string", "format": "date-time" }, "state": { "type": "string" } }
+      }
+    },
+    "responses": {
+      "Unauthorized": { "description": "Token administrativo ausente ou inválido" },
+      "Status": { "description": "Estado atual", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Status" } } } },
+      "QrUnavailable": { "description": "QR ainda não emitido, expirado ou sessão já conectada" }
+    }
+  },
+  "paths": {
+    "/healthz": { "get": { "security": [], "responses": { "200": { "description": "Processo vivo" } } } },
+    "/readyz": { "get": { "responses": { "200": { "$ref": "#/components/responses/Status" }, "503": { "$ref": "#/components/responses/Status" }, "401": { "$ref": "#/components/responses/Unauthorized" } } } },
+    "/api/v1/whatsapp/status": { "get": { "responses": { "200": { "$ref": "#/components/responses/Status" }, "401": { "$ref": "#/components/responses/Unauthorized" } } } },
+    "/api/v1/whatsapp/qrcode": { "get": { "responses": { "200": { "description": "QR temporário; não armazenar em cache", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Qr" } } } }, "409": { "$ref": "#/components/responses/QrUnavailable" }, "401": { "$ref": "#/components/responses/Unauthorized" } } } },
+    "/api/v1/whatsapp/qrcode.png": { "get": { "responses": { "200": { "description": "Imagem PNG do QR", "content": { "image/png": { "schema": { "type": "string", "format": "binary" } } } }, "409": { "$ref": "#/components/responses/QrUnavailable" }, "401": { "$ref": "#/components/responses/Unauthorized" } } } },
+    "/api/v1/whatsapp/connect": { "post": { "responses": { "200": { "$ref": "#/components/responses/Status" }, "401": { "$ref": "#/components/responses/Unauthorized" } } } },
+    "/api/v1/whatsapp/disconnect": { "post": { "responses": { "200": { "$ref": "#/components/responses/Status" }, "401": { "$ref": "#/components/responses/Unauthorized" } } } },
+    "/api/v1/whatsapp/logout": { "post": { "responses": { "200": { "$ref": "#/components/responses/Status" }, "401": { "$ref": "#/components/responses/Unauthorized" } } } },
+    "/api/v1/bot": { "put": {
+      "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["enabled"], "additionalProperties": false, "properties": { "enabled": { "type": "boolean" } } } } } },
+      "responses": { "200": { "$ref": "#/components/responses/Status" }, "400": { "description": "Corpo inválido" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+    } },
+    "/api/v1/integrations": { "get": { "responses": { "200": { "description": "Configuração das integrações sem segredos" }, "401": { "$ref": "#/components/responses/Unauthorized" } } } },
+    "/api/v1/integrations/barbershop/check": { "get": { "responses": { "200": { "description": "Catálogo consultado com sucesso" }, "502": { "description": "Falha na integração" }, "401": { "$ref": "#/components/responses/Unauthorized" } } } }
+  }
+}

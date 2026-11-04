@@ -1,0 +1,1047 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Good Style — API da IA",
+    "version": "1.0.0",
+    "description": "API servidor-a-servidor. Token Bearer obrigatório em todas as ações. POST exige Idempotency-Key. Datas/horas em America/Sao_Paulo; valores decimais em BRL. Execute sql/migracao_api_ia.sql antes de usar as operações de escrita. Leia API_IA.md para regras de repetição, autenticação do telefone, implantação e códigos de erro."
+  },
+  "servers": [
+    {
+      "url": "https://goodstyler.com",
+      "description": "Após implantação, caso o site esteja na raiz"
+    },
+    {
+      "url": "http://localhost/barbearia_agenda",
+      "description": "XAMPP local"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/admin/api_ia.php": {
+      "get": {
+        "operationId": "consultarBarbearia",
+        "summary": "Consultar catálogo, disponibilidade ou reservas pelo parâmetro acao",
+        "description": "acao=catalogo: sem outros parâmetros. acao=disponibilidade: exige barbeiro_id e servicos; aceita data_inicio/data_fim. acao=agendamentos: exige telefone; aceita pagina. Não misture parâmetros de ações diferentes. Sem datas, disponibilidade cobre a janela inteira; só data_inicio cobre apenas esse dia.",
+        "parameters": [
+          {
+            "name": "acao",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "catalogo",
+                "disponibilidade",
+                "agendamentos"
+              ],
+              "default": "catalogo"
+            }
+          },
+          {
+            "name": "barbeiro_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "servicos",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "1,2"
+            },
+            "description": "IDs separados por vírgula, do mesmo profissional."
+          },
+          {
+            "name": "data_inicio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "data_fim",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "telefone",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 30,
+              "example": "11999991234",
+              "description": "Telefone brasileiro com DDD; máscara e DDI 55 opcionais."
+            }
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resposta conforme acao",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CatalogoResposta"
+                    },
+                    {
+                      "$ref": "#/components/schemas/DisponibilidadeResposta"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ListaResposta"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Falha; veja codigo/erro.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "x-acoes": [
+          {
+            "operationId": "catalogo",
+            "summary": "Profissionais, serviços e dias permitidos (não garante vagas)",
+            "parameters": [
+              {
+                "name": "acao",
+                "in": "query",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "catalogo"
+                  ]
+                }
+              }
+            ],
+            "responses": {
+              "200": {
+                "description": "Sucesso",
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/CatalogoResposta"
+                    }
+                  }
+                }
+              },
+              "default": {
+                "description": "Falha. HTTP 400, 401, 404, 405, 409, 413, 415, 422, 500 ou 503; veja codigo/erro.",
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/Erro"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "operationId": "disponibilidade",
+            "summary": "Dias e horários livres para serviços específicos",
+            "parameters": [
+              {
+                "name": "acao",
+                "in": "query",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "disponibilidade"
+                  ]
+                }
+              },
+              {
+                "name": "barbeiro_id",
+                "in": "query",
+                "required": true,
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              {
+                "name": "servicos",
+                "in": "query",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "1,2"
+                },
+                "description": "IDs separados por vírgula, do mesmo profissional."
+              },
+              {
+                "name": "data_inicio",
+                "in": "query",
+                "required": false,
+                "schema": {
+                  "type": "string",
+                  "format": "date"
+                }
+              },
+              {
+                "name": "data_fim",
+                "in": "query",
+                "required": false,
+                "schema": {
+                  "type": "string",
+                  "format": "date"
+                }
+              }
+            ],
+            "responses": {
+              "200": {
+                "description": "Sucesso",
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/DisponibilidadeResposta"
+                    }
+                  }
+                }
+              },
+              "default": {
+                "description": "Falha. HTTP 400, 401, 404, 405, 409, 413, 415, 422, 500 ou 503; veja codigo/erro.",
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/Erro"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "operationId": "agendamentos",
+            "summary": "Reservas do telefone de hoje em diante, inclusive canceladas",
+            "parameters": [
+              {
+                "name": "acao",
+                "in": "query",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "agendamentos"
+                  ]
+                }
+              },
+              {
+                "name": "telefone",
+                "in": "query",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 10,
+                  "maxLength": 30,
+                  "example": "11999991234",
+                  "description": "Telefone brasileiro com DDD; máscara e DDI 55 opcionais."
+                }
+              },
+              {
+                "name": "pagina",
+                "in": "query",
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000,
+                  "default": 1
+                }
+              }
+            ],
+            "responses": {
+              "200": {
+                "description": "Sucesso",
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/ListaResposta"
+                    }
+                  }
+                }
+              },
+              "default": {
+                "description": "Falha. HTTP 400, 401, 404, 405, 409, 413, 415, 422, 500 ou 503; veja codigo/erro.",
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/Erro"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "alterarAgendamento",
+        "summary": "Agendar ou cancelar, com token e chave de idempotência",
+        "description": "Selecione acao=agendar ou acao=cancelar e envie o corpo correspondente. Os preços e durações vêm do banco; campos extras são rejeitados.",
+        "parameters": [
+          {
+            "name": "acao",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "agendar",
+                "cancelar"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{16,128}$"
+            },
+            "description": "UUID por operação. Reutilizar mesma chave/corpo em retries."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Agendar"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Cancelar"
+                  }
+                ]
+              },
+              "examples": {
+                "agendar": {
+                  "value": {
+                    "nome": "Rafael Silva",
+                    "telefone": "11999991234",
+                    "barbeiro_id": 1,
+                    "servicos": [
+                      1
+                    ],
+                    "data": "2026-10-24",
+                    "hora": "09:00"
+                  }
+                },
+                "cancelar": {
+                  "value": {
+                    "agendamento_id": 123,
+                    "telefone": "11999991234"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservaResposta"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true quando a resposta original é repetida",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservaResposta"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true quando a resposta original é repetida",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Falha; veja codigo/erro.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "x-acoes": [
+          {
+            "operationId": "agendar",
+            "summary": "Criar reserva avulsa; não suporta plano/PIN",
+            "parameters": [
+              {
+                "name": "acao",
+                "in": "query",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "agendar"
+                  ]
+                }
+              },
+              {
+                "name": "Idempotency-Key",
+                "in": "header",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]{16,128}$"
+                },
+                "description": "UUID por operação. Reutilizar mesma chave/corpo em retries."
+              }
+            ],
+            "responses": {
+              "201": {
+                "description": "Sucesso",
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/ReservaResposta"
+                    }
+                  }
+                },
+                "headers": {
+                  "Idempotency-Replayed": {
+                    "description": "true quando a resposta original é repetida",
+                    "schema": {
+                      "type": "string",
+                      "enum": [
+                        "true"
+                      ]
+                    }
+                  }
+                }
+              },
+              "default": {
+                "description": "Falha. HTTP 400, 401, 404, 405, 409, 413, 415, 422, 500 ou 503; veja codigo/erro.",
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/Erro"
+                    }
+                  }
+                }
+              }
+            },
+            "requestBody": {
+              "required": true,
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Agendar"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "operationId": "cancelar",
+            "summary": "Cancelar reserva pendente futura do telefone informado",
+            "parameters": [
+              {
+                "name": "acao",
+                "in": "query",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "cancelar"
+                  ]
+                }
+              },
+              {
+                "name": "Idempotency-Key",
+                "in": "header",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]{16,128}$"
+                },
+                "description": "UUID por operação. Reutilizar mesma chave/corpo em retries."
+              }
+            ],
+            "responses": {
+              "200": {
+                "description": "Sucesso",
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/ReservaResposta"
+                    }
+                  }
+                },
+                "headers": {
+                  "Idempotency-Replayed": {
+                    "description": "true quando a resposta original é repetida",
+                    "schema": {
+                      "type": "string",
+                      "enum": [
+                        "true"
+                      ]
+                    }
+                  }
+                }
+              },
+              "default": {
+                "description": "Falha. HTTP 400, 401, 404, 405, 409, 413, 415, 422, 500 ou 503; veja codigo/erro.",
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/Erro"
+                    }
+                  }
+                }
+              }
+            },
+            "requestBody": {
+              "required": true,
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Cancelar"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Segredo configurado via BARBEARIA_IA_TOKEN ou configs/api_ia.local.php; nunca na URL."
+      }
+    },
+    "schemas": {
+      "Erro": {
+        "type": "object",
+        "properties": {
+          "sucesso": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "codigo": {
+            "type": "string"
+          },
+          "erro": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sucesso",
+          "codigo",
+          "erro"
+        ]
+      },
+      "Servico": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "nome": {
+            "type": "string"
+          },
+          "preco": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]{2}$",
+            "example": "30.00"
+          },
+          "duracao_minutos": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "id",
+          "nome",
+          "preco",
+          "duracao_minutos"
+        ]
+      },
+      "ServicoReservado": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "nome": {
+            "type": "string"
+          },
+          "preco": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]{2}$",
+            "example": "30.00"
+          }
+        },
+        "required": [
+          "id",
+          "nome",
+          "preco"
+        ]
+      },
+      "Barbeiro": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "nome": {
+            "type": "string"
+          },
+          "especialidade": {
+            "type": "string",
+            "nullable": true
+          },
+          "servicos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Servico"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "nome",
+          "especialidade",
+          "servicos"
+        ]
+      },
+      "Janela": {
+        "type": "object",
+        "properties": {
+          "inicio": {
+            "type": "string",
+            "format": "date"
+          },
+          "fim": {
+            "type": "string",
+            "format": "date"
+          },
+          "limite_dias": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60
+          }
+        },
+        "required": [
+          "inicio",
+          "fim",
+          "limite_dias"
+        ]
+      },
+      "Horario": {
+        "type": "object",
+        "properties": {
+          "hora": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "hora_fim": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          }
+        },
+        "required": [
+          "hora",
+          "hora_fim"
+        ]
+      },
+      "Dia": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "string",
+            "format": "date"
+          },
+          "disponivel": {
+            "type": "boolean"
+          },
+          "horarios": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Horario"
+            }
+          }
+        },
+        "required": [
+          "data",
+          "disponivel",
+          "horarios"
+        ]
+      },
+      "Agendamento": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "barbeiro_id": {
+            "type": "integer",
+            "minimum": 1,
+            "nullable": true
+          },
+          "barbeiro": {
+            "type": "string",
+            "nullable": true
+          },
+          "cliente_nome": {
+            "type": "string"
+          },
+          "telefone": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 30,
+            "example": "11999991234",
+            "description": "Telefone brasileiro com DDD; máscara e DDI 55 opcionais."
+          },
+          "data": {
+            "type": "string",
+            "format": "date"
+          },
+          "hora": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "hora_fim": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+            "nullable": true
+          },
+          "valor_total": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]{2}$",
+            "example": "30.00"
+          },
+          "status": {
+            "type": "string"
+          },
+          "plano_usado": {
+            "type": "boolean"
+          },
+          "servicos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServicoReservado"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "barbeiro_id",
+          "barbeiro",
+          "cliente_nome",
+          "telefone",
+          "data",
+          "hora",
+          "hora_fim",
+          "valor_total",
+          "status",
+          "plano_usado",
+          "servicos"
+        ]
+      },
+      "CatalogoResposta": {
+        "type": "object",
+        "properties": {
+          "sucesso": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "timezone": {
+            "type": "string",
+            "enum": [
+              "America/Sao_Paulo"
+            ]
+          },
+          "moeda": {
+            "type": "string",
+            "enum": [
+              "BRL"
+            ]
+          },
+          "janela": {
+            "$ref": "#/components/schemas/Janela"
+          },
+          "dias_atendimento": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          "barbeiros": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Barbeiro"
+            }
+          }
+        },
+        "required": [
+          "sucesso",
+          "timezone",
+          "moeda",
+          "janela",
+          "dias_atendimento",
+          "barbeiros"
+        ]
+      },
+      "DisponibilidadeResposta": {
+        "type": "object",
+        "properties": {
+          "sucesso": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "timezone": {
+            "type": "string",
+            "enum": [
+              "America/Sao_Paulo"
+            ]
+          },
+          "barbeiro_id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "duracao_minutos": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "minutos_reservados": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "dias": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Dia"
+            }
+          }
+        },
+        "required": [
+          "sucesso",
+          "timezone",
+          "barbeiro_id",
+          "duracao_minutos",
+          "minutos_reservados",
+          "dias"
+        ]
+      },
+      "ListaResposta": {
+        "type": "object",
+        "properties": {
+          "sucesso": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "timezone": {
+            "type": "string",
+            "enum": [
+              "America/Sao_Paulo"
+            ]
+          },
+          "pagina": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "tem_mais": {
+            "type": "boolean"
+          },
+          "agendamentos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Agendamento"
+            }
+          }
+        },
+        "required": [
+          "sucesso",
+          "timezone",
+          "pagina",
+          "tem_mais",
+          "agendamentos"
+        ]
+      },
+      "ReservaResposta": {
+        "type": "object",
+        "properties": {
+          "sucesso": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "timezone": {
+            "type": "string",
+            "enum": [
+              "America/Sao_Paulo"
+            ]
+          },
+          "agendamento": {
+            "$ref": "#/components/schemas/Agendamento"
+          }
+        },
+        "required": [
+          "sucesso",
+          "timezone",
+          "agendamento"
+        ]
+      },
+      "Agendar": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "telefone": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 30,
+            "example": "11999991234",
+            "description": "Telefone brasileiro com DDD; máscara e DDI 55 opcionais."
+          },
+          "barbeiro_id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "servicos": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "minItems": 1,
+            "maxItems": 20,
+            "uniqueItems": true
+          },
+          "data": {
+            "type": "string",
+            "format": "date"
+          },
+          "hora": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          }
+        },
+        "required": [
+          "nome",
+          "telefone",
+          "barbeiro_id",
+          "servicos",
+          "data",
+          "hora"
+        ],
+        "additionalProperties": false
+      },
+      "Cancelar": {
+        "type": "object",
+        "properties": {
+          "agendamento_id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "telefone": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 30,
+            "example": "11999991234",
+            "description": "Telefone brasileiro com DDD; máscara e DDI 55 opcionais."
+          }
+        },
+        "required": [
+          "agendamento_id",
+          "telefone"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

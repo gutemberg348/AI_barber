@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#20382e"><meta name="description" content="Seu atendimento, do seu jeito. Painel de controle da Luna.">
+  <title>Luna · Central de atendimento</title><link rel="icon" href="/painel/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/painel/style.css"><script type="module" src="/painel/app.js"></script>
+</head>
+<body>
+<svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-12.5 7.5L3 21l2-5.5A8.5 8.5 0 1 1 21 11.5Z"/><path d="M8 10h8M8 14h5"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+  <symbol id="i-qr" viewBox="0 0 24 24"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="3" y="15" width="6" height="6" rx="1"/><path d="M15 15h3v3h3v3h-6M21 12v3M12 3v6M3 12h6M12 15v6"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="m13 2-9 12h7l-1 8 10-13h-8l1-7Z"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 8a8 8 0 1 0 0 8M20 3v5h-5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-out" viewBox="0 0 24 24"><path d="M9 4H4v16h5m7-12 4 4-4 4m-7-4h11"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 4v3"/></symbol>
+</defs></svg>
+
+<section id="login-screen" class="login-screen">
+  <div class="login-art"><a class="brand" href="/painel"><img src="/painel/icon.svg" alt="" width="42" height="42">luna<span>studio</span></a>
+    <div class="login-copy"><span class="eyebrow">MAIS TEMPO PARA FAZER O SEU MELHOR</span><h1>Você cuida<br>do estilo.<br><em>A Luna, da conversa.</em></h1><p>Seu atendimento conectado, organizado<br>e com a personalidade da sua barbearia.</p></div>
+    <div class="login-orbit" aria-hidden="true"><span class="orbit-ring"></span><span class="orbit-ring second"></span><span class="orb">l<span>✦</span></span><span class="orbit-pill">✦ Do seu jeito</span></div>
+    <small>Feita para conversas que viram bons encontros.</small>
+  </div>
+  <div class="login-form-wrap"><form id="login-form" class="login-form">
+    <span class="tag"><svg><use href="#i-lock"/></svg> ACESSO DO ADMINISTRADOR</span>
+    <h2>Bom ter você aqui.</h2><p>Entre para cuidar do atendimento da sua barbearia.</p>
+    <label for="access-key">Chave de acesso</label><input id="access-key" type="password" autocomplete="current-password" required minlength="32" placeholder="Sua chave administrativa">
+    <p class="field-help">Use a chave <code>ADMIN_API_TOKEN</code> do seu arquivo .env.</p>
+    <p id="login-error" class="form-error" role="alert" hidden></p>
+    <button class="button primary full" id="login-button" type="submit">Entrar no painel <svg><use href="#i-arrow"/></svg></button>
+    <div class="login-note"><svg><use href="#i-lock"/></svg><span>Acesso protegido. Sua chave não fica salva no navegador.</span></div>
+  </form><small class="login-footer">LUNA STUDIO <span>SEU ATENDIMENTO, DO SEU JEITO.</span></small></div>
+</section>
+
+<div id="workspace" class="workspace" hidden>
+  <aside class="sidebar"><a class="brand" href="#overview"><img src="/painel/icon.svg" alt="" width="38" height="38">luna<span>studio</span></a><div class="workspace-label">SEU ESPAÇO</div>
+    <nav aria-label="Navegação principal">
+      <a href="#overview" data-nav="overview" class="nav-link active"><svg><use href="#i-grid"/></svg><span>Visão geral</span></a>
+      <a href="#connection" data-nav="connection" class="nav-link"><svg><use href="#i-chat"/></svg><span>WhatsApp</span><span class="nav-dot" id="nav-connection-dot"></span></a>
+      <a href="#teachings" data-nav="teachings" class="nav-link"><svg><use href="#i-book"/></svg><span>Ensinamentos</span></a>
+      <a href="#settings" data-nav="settings" class="nav-link"><svg><use href="#i-settings"/></svg><span>Configurações</span></a>
+    </nav>
+    <div class="sidebar-bottom"><div class="sidebar-tip"><span>✦</span><strong>Cada detalhe conta.</strong><p>Ensine o seu jeito de atender. A Luna leva isso para cada conversa.</p><a href="#teachings">Personalizar a Luna <span>↗</span></a></div>
+    <button id="logout-button" class="logout"><svg><use href="#i-out"/></svg>Sair do painel</button><div class="sidebar-shop"><span id="shop-avatar">GS</span><div><strong data-shop>Minha barbearia</strong><small>Espaço de trabalho</small></div></div></div>
+  </aside>
+  <div class="main-wrap"><header class="topbar"><div class="breadcrumb">Seu espaço <span>/</span> <strong id="page-label">Visão geral</strong></div><a class="mobile-brand" href="#overview"><img src="/painel/icon.svg" width="30" height="30" alt="Luna">luna</a><div class="topbar-right"><span id="live-indicator" class="live-indicator">Conectando ao painel</span><span class="profile-avatar" id="owner-avatar">J</span></div></header>
+  <main>
+    <div id="offline-banner" class="banner warning" role="status" hidden>Não foi possível atualizar. Confira sua conexão; os controles ficam indisponíveis até reconectar.</div>
+    <section data-page="overview">
+      <div class="page-heading"><div><span class="eyebrow muted" id="today-label">SUA CENTRAL DE ATENDIMENTO</span><h1>Tudo sob controle<span class="accent">.</span></h1><p>Um olhar para o atendimento. Mais tempo para a barbearia.</p></div><a href="#teachings" class="button secondary"><svg><use href="#i-plus"/></svg>Ensinar a Luna</a></div>
+      <div class="hero"><div class="hero-copy"><span class="status-pill" id="hero-status">Verificando atendimento</span><h2 id="hero-title">Sua assistente.<br>Seu jeito de atender.</h2><p id="hero-description">Acompanhe o WhatsApp e deixe tudo pronto para receber seus clientes.</p><div class="hero-controls"><button class="button lime" data-toggle-bot disabled><svg><use href="#i-bolt"/></svg><span>Carregando...</span></button><a href="#connection" class="hero-link">Gerenciar conexão <span>↗</span></a></div></div><div class="hero-art" aria-hidden="true"><div class="hero-orbit"></div><div class="hero-orbit outer"></div><div class="luna-sphere">l<span>✦</span></div><div class="float-label upper">✦ Luna, sua assistente</div><div class="float-label lower"><span class="tiny-dot"></span>Conversa boa começa aqui</div></div></div>
+      <div class="stats"><article class="stat-card"><div class="stat-top"><span>Conversas recentes</span><svg><use href="#i-chat"/></svg></div><strong id="count-conversations">—</strong><small id="conversation-window">No período de memória</small></article><article class="stat-card"><div class="stat-top"><span>Aguardando confirmação</span><svg><use href="#i-clock"/></svg></div><strong id="count-waiting">—</strong><small>Pedidos preparados, ainda sem reserva</small></article><article class="stat-card"><div class="stat-top"><span>Ensinamentos ativos</span><svg><use href="#i-book"/></svg></div><strong id="count-teachings">—</strong><small>O seu toque em cada conversa</small></article></div>
+      <div id="uncertain-banner" class="banner warning" hidden></div>
+      <div class="overview-bottom"><article class="card"><div class="card-heading"><h2>Conexões da Luna</h2><a href="#settings" class="text-link">Ver detalhes ↗</a></div><div class="integration-row"><span class="integration-icon whatsapp"><svg><use href="#i-chat"/></svg></span><div><strong>WhatsApp</strong><small>Seu canal de atendimento</small></div><span class="badge" id="overview-wa">Verificando</span></div><div class="integration-row"><span class="integration-icon"><svg><use href="#i-bolt"/></svg></span><div><strong>Inteligência artificial</strong><small>Respostas com o jeito da sua barbearia</small></div><span class="badge" id="overview-ai">Verificando</span></div><div class="integration-row"><span class="integration-icon sand"><svg><use href="#i-clock"/></svg></span><div><strong>Agenda da barbearia</strong><small>Serviços e horários do seu site</small></div><span class="badge" id="overview-site">Verificando</span></div></article>
+      <article class="card teaching-invite"><span class="mini-icon"><svg><use href="#i-book"/></svg></span><span class="eyebrow muted">FEITA PARA A SUA BARBEARIA</span><h2>Quanto mais ela aprende,<br>mais parece com você.</h2><p>Adicione orientações de atendimento, informações úteis e o jeito de falar da sua equipe.</p><a href="#teachings" class="text-link">Criar um ensinamento <svg><use href="#i-arrow"/></svg></a></article></div>
+    </section>
+
+    <section data-page="connection" hidden><div class="page-heading"><div><span class="eyebrow muted">SEMPRE POR PERTO</span><h1>Conecte as conversas<span class="accent">.</span></h1><p>O WhatsApp da sua barbearia, pronto para receber clientes.</p></div><span class="badge" id="connection-badge">Verificando</span></div>
+      <div class="connection-layout"><article class="card qr-card"><div class="card-heading"><h2>Conexão do WhatsApp</h2><svg><use href="#i-qr"/></svg></div><div class="qr-stage"><img id="qr-image" alt="QR Code para conectar o WhatsApp da barbearia" width="280" height="280" hidden><div id="qr-placeholder"><span class="qr-placeholder-icon"><svg><use href="#i-qr"/></svg></span><h3 id="qr-title">Vamos conectar?</h3><p id="qr-description">Gere o QR Code para vincular o WhatsApp da barbearia.</p></div></div><p id="qr-expiry" class="qr-expiry" aria-live="polite">O QR Code aparece aqui e se atualiza automaticamente.</p><button id="connect-button" class="button primary full" data-wa="connect"><svg><use href="#i-qr"/></svg><span>Gerar QR Code</span></button><div class="connection-actions"><button class="button ghost" data-wa="disconnect" id="disconnect-button">Desconectar</button><button class="button ghost danger" id="unlink-button">Trocar número</button></div></article>
+      <div class="connection-info"><article class="card"><span class="eyebrow muted">É RÁPIDO E SIMPLES</span><h2>Seu WhatsApp, em 3 passos.</h2><ol class="steps"><li><span>1</span><div><strong>Abra o WhatsApp da barbearia</strong><p>Use o celular do número que vai atender seus clientes.</p></div></li><li><span>2</span><div><strong>Vá em Aparelhos conectados</strong><p>No menu ou nas configurações, toque em “Conectar um aparelho”.</p></div></li><li><span>3</span><div><strong>Aponte a câmera para o QR</strong><p>Depois da leitura, a conexão será confirmada neste painel.</p></div></li></ol><div class="soft-note">Está no mesmo celular? Abra este painel em um computador ou em outra tela para escanear o QR.</div></article><article class="card compact-card"><svg><use href="#i-lock"/></svg><div><strong>Conexão sob seu controle</strong><p>Pausar a Luna mantém o WhatsApp conectado. Desconectar interrompe a conexão. Trocar o número exige um novo vínculo.</p></div></article></div></div>
+    </section>
+
+    <section data-page="teachings" hidden><div class="page-heading"><div><span class="eyebrow muted">O SEU JEITO, EM CADA RESPOSTA</span><h1>Ensine a Luna<span class="accent">.</span></h1><p>Pequenas orientações. Um atendimento muito mais seu.</p></div><button class="button primary" id="add-lesson"><svg><use href="#i-plus"/></svg>Novo ensinamento</button></div>
+      <div class="knowledge-note"><span>✦</span><p>Os ensinamentos salvos entram nas próximas respostas da Luna. Serviços, preços e vagas continuam sendo consultados no site.</p></div>
+      <div class="teaching-toolbar"><label class="search"><svg><use href="#i-search"/></svg><input id="lesson-search" type="search" placeholder="Buscar ensinamentos" aria-label="Buscar ensinamentos"></label><select id="lesson-filter" aria-label="Filtrar por categoria"><option value="all">Todas as categorias</option><option value="atendimento">Atendimento</option><option value="informacoes">Informações</option><option value="regras">Regras</option></select></div>
+      <div class="list-meta"><span id="lesson-count">Carregando ensinamentos...</span><span id="saved-label"></span></div><div id="lesson-list" class="lesson-grid"></div>
+      <div id="lesson-empty" class="empty-state" hidden><span class="mini-icon"><svg><use href="#i-book"/></svg></span><h2>O primeiro ensinamento é seu.</h2><p>Conte como você gosta de receber seus clientes.<br>A Luna aprende o seu jeito, uma orientação de cada vez.</p><button class="button primary" data-new-lesson>Adicionar ensinamento</button></div>
+      <div id="no-results" class="empty-state" hidden><h2>Nenhum resultado por aqui.</h2><p>Tente outro termo ou categoria.</p></div>
+      <div class="inspiration"><h3>Uma ideia para começar</h3><div class="template-grid"><button data-template="tone"><span>💬</span><strong>Jeito de falar</strong><small>Tom, expressões e personalidade</small><span class="template-plus">+</span></button><button data-template="place"><span>📍</span><strong>Informações úteis</strong><small>Endereço e referências para chegar</small><span class="template-plus">+</span></button><button data-template="care"><span>✂️</span><strong>Cuidados no atendimento</strong><small>Como acolher dúvidas e pedidos</small><span class="template-plus">+</span></button></div></div>
+    </section>
+
+    <section data-page="settings" hidden><div class="page-heading"><div><span class="eyebrow muted">TUDO NO SEU LUGAR</span><h1>Configurações<span class="accent">.</span></h1><p>Acompanhe sua operação e escolha quando a Luna atende.</p></div></div>
+      <div class="settings-grid"><article class="card"><div class="card-heading"><h2>Atendimento automático</h2><svg><use href="#i-bolt"/></svg></div><div class="setting-toggle"><div><strong>Luna ativada</strong><p>Permitir respostas automáticas no WhatsApp.</p></div><button id="bot-switch" class="switch" role="switch" aria-checked="false" aria-label="Ativar atendimento da Luna" data-toggle-bot disabled><span></span></button></div><div class="soft-note">Ao pausar, a Luna deixa de enviar respostas. Uma operação já enviada ao site pode terminar; as reservas existentes são preservadas.</div></article>
+      <article class="card"><div class="card-heading"><h2>Seu espaço</h2><span class="mini-label">BARBEARIA</span></div><dl class="detail-list"><div><dt>Nome</dt><dd data-shop>—</dd></div><div><dt>Responsável</dt><dd id="setting-owner">—</dd></div><div><dt>Fuso horário</dt><dd id="setting-timezone">—</dd></div><div><dt>Modelo da Luna</dt><dd id="setting-model">—</dd></div></dl></article>
+      <article class="card"><div class="card-heading"><h2>Integração com o site</h2><svg><use href="#i-clock"/></svg></div><p class="card-description">Confira se a Luna consegue consultar o catálogo da barbearia.</p><div id="integration-result" class="soft-note" role="status">A conexão ainda não foi verificada nesta sessão.</div><button class="button secondary full" id="check-integration"><svg><use href="#i-refresh"/></svg>Verificar integração</button><a id="site-link" class="text-link site-link" target="_blank" rel="noopener noreferrer">Abrir site da barbearia ↗</a></article>
+      <article class="card"><div class="card-heading"><h2>Sua sessão</h2><svg><use href="#i-lock"/></svg></div><p class="card-description">Este acesso ao painel dura até 8 horas. Sair do painel não desconecta a Luna do WhatsApp.</p><button class="button secondary" id="settings-logout">Sair do painel <svg><use href="#i-out"/></svg></button></article></div>
+    </section>
+    <footer class="main-footer"><span>LUNA STUDIO</span><span>Menos tarefas. Mais boas conversas.</span></footer>
+  </main></div>
+  <nav class="mobile-nav" aria-label="Navegação no celular"><a href="#overview" data-nav="overview"><svg><use href="#i-grid"/></svg>Início</a><a href="#connection" data-nav="connection"><svg><use href="#i-chat"/></svg>WhatsApp</a><a href="#teachings" data-nav="teachings"><svg><use href="#i-book"/></svg>Ensinar</a><a href="#settings" data-nav="settings"><svg><use href="#i-settings"/></svg>Ajustes</a></nav>
+</div>
+<dialog id="lesson-dialog"><form id="lesson-form"><div class="dialog-heading"><div><span class="eyebrow muted">PERSONALIZE O ATENDIMENTO</span><h2 id="lesson-dialog-title">Novo ensinamento</h2></div><button type="button" class="icon-button" data-close-dialog aria-label="Fechar"><svg><use href="#i-close"/></svg></button></div><label for="lesson-title">Título</label><input id="lesson-title" required maxlength="80" placeholder="Ex.: Nosso jeito de receber os clientes"><label for="lesson-category">Categoria</label><select id="lesson-category"><option value="atendimento">Atendimento</option><option value="informacoes">Informações</option><option value="regras">Regras</option></select><label for="lesson-content">O que a Luna precisa saber?</label><textarea id="lesson-content" required maxlength="1500" rows="7" placeholder="Escreva uma orientação clara, como se estivesse ensinando alguém da sua equipe."></textarea><div class="field-help split"><span>Seja específico. Não inclua senhas ou dados de clientes.</span><span id="content-count">0 / 1500</span></div><label class="checkbox-label"><input id="lesson-enabled" type="checkbox" checked>Usar este ensinamento no atendimento</label><p id="lesson-error" class="form-error" role="alert" hidden></p><div class="dialog-actions"><button type="button" class="button secondary" data-close-dialog>Cancelar</button><button class="button primary" type="submit" id="save-lesson">Salvar ensinamento</button></div></form></dialog>
+<dialog id="confirm-dialog"><form method="dialog"><div class="dialog-heading"><h2 id="confirm-title">Confirmar ação</h2><button class="icon-button" value="cancel" aria-label="Fechar"><svg><use href="#i-close"/></svg></button></div><p id="confirm-description"></p><div class="dialog-actions"><button class="button secondary" value="cancel">Cancelar</button><button id="confirm-action" class="button primary" value="confirm">Confirmar</button></div></form></dialog>
+<div id="toast" class="toast" role="status" hidden></div>
+</body></html>

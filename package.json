@@ -1,0 +1,30 @@
+{
+  "name": "luna-barbearia-whatsapp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Atendimento Luna via OpenAI, Baileys e API da barbearia",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "setup": "node scripts/setup.js",
+    "dev": "node --watch --env-file-if-exists=.env src/server.js",
+    "start": "node --env-file-if-exists=.env src/server.js",
+    "check": "node scripts/check.js",
+    "diagnose:site": "node --env-file-if-exists=.env scripts/diagnose-site.js",
+    "test": "node --test --test-concurrency=1 test/*.test.js",
+    "verify": "npm run check && npm test"
+  },
+  "dependencies": {
+    "@fastify/helmet": "13.2.0",
+    "@fastify/rate-limit": "11.2.1",
+    "@whiskeysockets/baileys": "7.0.0-rc14",
+    "fastify": "5.12.7",
+    "openai": "7.43.0",
+    "pino": "10.4.0",
+    "proper-lockfile": "4.1.2",
+    "qrcode": "1.5.4",
+    "zod": "4.6.7"
+  }
+}

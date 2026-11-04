@@ -1,0 +1,49 @@
+services:
+  luna:
+    build: .
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_PATH: /app/data/luna.sqlite
+      LUNA_PROMPT_PATH: /app/prompts/luna.md
+      WHATSAPP_AUTO_CONNECT: "true"
+      WHATSAPP_PRINT_QR: "false"
+    ports:
+      - "127.0.0.1:3308:3000"
+    volumes:
+      - luna_data:/app/data
+    stop_grace_period: 25s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+  caddy:
+    # Opcional: não iniciar na VPS que já usa Nginx nas portas 80/443.
+    profiles: ["caddy"]
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      luna:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  luna_data:
+  caddy_data:
+  caddy_config:
