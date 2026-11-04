@@ -53,13 +53,13 @@ function renderStatus() {
   $('#count-waiting').textContent = overview.counts.waiting;
   $('#count-teachings').textContent = overview.counts.teachings;
   $('#conversation-window').textContent = `Conversas nas últimas ${overview.historyHours} horas`;
-  $('#control-badge').textContent = !fresh ? 'Sem atualização' : s.botEnabled ? 'Ligada' : 'Desligada';
+  $('#control-badge').textContent = !fresh ? 'Sem atualização' : s.botEnabled ? 'Ligado' : 'Desligado';
   $('#control-badge').classList.toggle('is-on', fresh && s.botEnabled);
   $('.bot-console').classList.toggle('is-off', !s.botEnabled);
-  $('#control-title').textContent = s.botEnabled ? 'Luna ligada' : 'Luna desligada';
+  $('#control-title').textContent = s.botEnabled ? 'Desligar Agente IA BARBER' : 'Ligar Agente IA BARBER';
   $('#control-description').textContent = !fresh ? 'Aguardando atualização do servidor.' : !s.botEnabled ? 'As respostas automáticas estão pausadas. Ligue quando quiser.' : !s.connected ? 'Atendimento ativado. Conecte o WhatsApp para começar.' : !s.openaiConfigured || !s.barbershopConfigured ? 'Atendimento ativado. Confira as integrações para começar.' : 'Respondendo seus clientes automaticamente.';
   const connection = $('#control-connection'); connection.replaceChildren(node('span', `tiny-dot${s.connected ? ' connected' : ''}`), document.createTextNode(fresh ? `WhatsApp ${s.connected ? 'conectado' : 'desconectado'}` : 'Aguardando conexão'));
-  $$('[data-toggle-bot]').forEach(button => { button.disabled = mutating || !fresh; button.setAttribute('aria-checked', String(s.botEnabled)); });
+  $$('[data-toggle-bot]').forEach(button => { button.disabled = mutating || !fresh; button.setAttribute('aria-checked', String(s.botEnabled)); button.setAttribute('aria-label', s.botEnabled ? 'Desligar Agente IA BARBER' : 'Ligar Agente IA BARBER'); });
   renderSchedule();
   badge('#overview-wa', fresh ? stateNames[s.state] ?? 'Verificando' : 'Sem atualização', fresh && s.connected, fresh && !s.connected);
   badge('#overview-ai', s.openaiConfigured ? 'Configurada' : 'Configurar', s.openaiConfigured, !s.openaiConfigured);
@@ -67,7 +67,7 @@ function renderStatus() {
   badge('#connection-badge', fresh ? stateNames[s.state] ?? 'Verificando' : 'Sem atualização', fresh && s.connected, !s.connected);
   $('#nav-connection-dot').classList.toggle('connected', fresh && s.connected);
   $('#uncertain-banner').hidden = !overview.counts.uncertain;
-  $('#uncertain-banner').textContent = `${overview.counts.uncertain} pedido(s) aguardando resultado do site. A Luna preserva esses pedidos e permite ao cliente conferir respondendo CONFIRMAR.`;
+  $('#uncertain-banner').textContent = `${overview.counts.uncertain} pedido(s) aguardando resultado do site. O Agente IA BARBER preserva esses pedidos e permite ao cliente conferir respondendo CONFIRMAR.`;
   $('#setting-owner').textContent = overview.owner; $('#setting-timezone').textContent = overview.timezone; $('#setting-model').textContent = overview.model;
   $('#site-link').href = overview.siteUrl;
   $('#connect-button').disabled = mutating || !fresh || s.connected || ['connecting', 'qr', 'reconnecting'].includes(s.state);
@@ -200,7 +200,7 @@ $('#login-form').addEventListener('submit', async event => {
   catch (error) { $('#login-error').textContent = error.message; $('#login-error').hidden = false; }
   finally { $('#login-button').disabled = false; }
 });
-$$('[data-toggle-bot]').forEach(button => button.addEventListener('click', () => void mutate(() => api('bot', { method: 'PUT', body: JSON.stringify({ enabled: !overview.status.botEnabled }) }), overview.status.botEnabled ? 'Luna pausada.' : 'Luna ativada.')));
+$$('[data-toggle-bot]').forEach(button => button.addEventListener('click', () => void mutate(() => api('bot', { method: 'PUT', body: JSON.stringify({ enabled: !overview.status.botEnabled }) }), overview.status.botEnabled ? 'Agente IA BARBER desligado.' : 'Agente IA BARBER ligado.')));
 $('#pause-time').addEventListener('input', () => { scheduleDirty = true; });
 $('#pause-repeat').addEventListener('change', () => { scheduleDirty = true; });
 $('#pause-form').addEventListener('submit', async event => {

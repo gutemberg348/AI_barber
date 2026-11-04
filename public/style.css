@@ -21,6 +21,9 @@
 .bot-console { border: 1px solid #dbe4d1; background: #fff; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
 .console-top { padding: 25px 26px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .console-identity { display: flex; align-items: center; gap: 12px; }
+.console-identity { min-width: 0; }
+.console-identity>div { min-width: 0; }
+.console-identity img { flex-shrink: 0; }
 .console-identity img { border-radius: 14px; }
 .console-identity strong { display: block; font-size: 19px; letter-spacing: -.5px; font-weight: 650; }
 .console-identity div>span { font-size: 10px; color: #8c9786; display: block; margin-top: 4px; }
@@ -85,7 +88,7 @@
   .control-heading { margin-bottom: 20px; }
   .dashboard-label { display: none; }
   .console-top { padding: 21px 20px 0; }
-  .console-identity strong { font-size: 20px; }
+  .console-identity strong { font-size: 16px; line-height: 1.35; }
   .console-identity div>span { font-size: 10px; max-width: 155px; }
   .console-toggle-row { min-height: 130px; padding: 26px 20px; }
   .console-toggle-row h2 { font-size: 25px; }
