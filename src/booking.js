@@ -22,6 +22,7 @@ export const schemas = {
   conferir_horario: z.strictObject({ barbeiro_id: id, servicos: services, data: date, hora: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/) }),
   agendamentos: z.strictObject({ pagina: z.number().int().min(1).max(1000) }),
   orientar_visita: z.strictObject({ data: date.nullable(), hora: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).nullable() }),
+  conferir_agendamento: z.strictObject({ data: date.nullable(), hora: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).nullable() }),
   preparar_agendamento: z.strictObject({ nome: z.string().trim().min(2).max(100), barbeiro_id: id, servicos: services, data: date, hora: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/) }),
   preparar_cancelamento: z.strictObject({ agendamento_id: id }),
 };
@@ -66,7 +67,7 @@ export class BookingService {
     if (name === 'disponibilidade') return this.api.request('disponibilidade', args);
     if (name === 'grade_horarios') return scheduleReply(this.api, args);
     if (name === 'agendamentos') return this.api.request('agendamentos', { telefone: phone, ...args });
-    if (name === 'orientar_visita') return visitReply(this.api, phone, args, localTime(this.config.BARBEARIA_TIMEZONE), this.store.get('pending', phone)?.state === 'executing');
+    if (['orientar_visita', 'conferir_agendamento'].includes(name)) return visitReply(this.api, phone, args, localTime(this.config.BARBEARIA_TIMEZONE), this.store.get('pending', phone)?.state === 'executing', name === 'conferir_agendamento');
     // Uma operação cujo resultado é incerto bloqueia outra até recuperar o resultado.
     const previous = this.store.get('pending', phone);
     if (previous?.state === 'executing' && ['preparar_agendamento', 'preparar_cancelamento'].includes(name)) return { directReply: this.retryText(previous) };

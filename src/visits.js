@@ -18,7 +18,7 @@ const clean = value => value.replace(/[\r\n\x00-\x1f]/g, ' ').slice(0, 120);
 const label = appointment => `${appointment.data.split('-').reverse().join('/')} às ${appointment.hora} · ${clean(appointment.barbeiro)}`;
 
 // Só leitura do remetente autenticado. Um pedido local não é uma reserva.
-export async function visitReply(api, phone, query, currentTime, uncertain = false) {
+export async function visitReply(api, phone, query, currentTime, uncertain = false, checkingBooking = false) {
   const appointments = [];
   for (let page = 1; page <= 20; page++) {
     const parsed = pageSchema.safeParse(await api.request('agendamentos', { telefone: phone, pagina: page }));
@@ -31,12 +31,17 @@ export async function visitReply(api, phone, query, currentTime, uncertain = fal
     && `${item.data} ${item.hora_fim ?? item.hora}` >= currentTime)
     .sort((a, b) => `${a.data} ${a.hora}`.localeCompare(`${b.data} ${b.hora}`));
   const match = active.find(item => (!query.data || item.data === query.data) && (!query.hora || item.hora === query.hora));
-  if (match) return { directReply: `Você já tem horário marcado! 👊\n${label(match)}\nTe esperamos no dia e horário marcados. 💈` };
+  if (match) return { directReply: checkingBooking
+    ? `Encontrei seu agendamento no site! 👊\n${label(match)}\nSeu horário continua esse mesmo. 💈`
+    : `Você já tem horário marcado! 👊\n${label(match)}\nTe esperamos no dia e horário marcados. 💈` };
   const period = query.data ? ` para ${query.data.split('-').reverse().join('/')}${query.hora ? ` às ${query.hora}` : ''}`
-    : query.hora ? ` às ${query.hora}` : ' no seu WhatsApp';
+    : query.hora ? ` às ${query.hora}` : ' no site';
   const noBooking = `Não encontrei horário marcado${period}.`;
   if (uncertain) return { directReply: `${noBooking}\nSeu pedido anterior ainda aguarda resultado. Responda CONFIRMAR para conferir esse pedido. 💈` };
   const next = active[0];
+  if (checkingBooking) return { directReply: next
+    ? `No site, encontrei este horário:\n${label(next)}\nÉ esse agendamento que você quer conferir? 💈`
+    : 'Não consegui localizar esse agendamento na consulta do site. Ele foi feito com este mesmo número? Confira também em “Meus horários” no site. 💈' };
   return { directReply: next
     ? `${noBooking}\nVocê tem reserva em ${label(next)}.\nPara ir em outro horário, precisa agendar. Quer marcar? 💈`
     : `${noBooking}\nPrecisa agendar antes de ir. Quer marcar? 💈` };

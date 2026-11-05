@@ -14,6 +14,7 @@ const descriptions = {
   grade_horarios: 'Consultar o site e ENVIAR a grade atual quando falta escolher horário ou o cliente pediu para ver vagas. Se já informou dia e hora, peça somente o nome caso falte; se também há nome, use preparar_agendamento diretamente, que revalida a vaga. data: dia escolhido, ou null para próximos dias livres sem exigir uma data do cliente. comparar_barbeiros: true para qualquer barbeiro/quem tem vaga, usando barbeiro_id e servicos reais como referência de equivalência; false para preferência definida. Sem vaga ou fora da agenda liberada, já busca alternativas reais de dias/profissionais. Use para TODA exibição de vagas, mesmo repetindo o dia; nunca reutilize o histórico. Só consulta, não reserva nem troca a escolha.',
   conferir_horario: 'Consultar a vaga específica quando o cliente já informou profissional, serviço, dia e hora, mas ainda falta o nome. Não reenvia a grade se o horário está livre: após consultar, peça só o nome. Se ocupado, já apresenta alternativas reais. Se o nome já foi informado, use preparar_agendamento diretamente. Não reserva nem garante a vaga.',
   agendamentos: 'Consultar reservas do próprio remetente autenticado. Página inicial: 1.',
+  conferir_agendamento: 'Conferir no SITE uma reserva que o cliente diz já ter: "tenho um agendamento para 12:45, continua?", "meu horário está marcado?", "marquei pelo site". Só leitura do próprio remetente, inclusive reservas feitas diretamente pelo site. Use data/hora informadas; null para dados não mencionados. Consulta agora e envia resposta pronta. Se não localizar, esclarece a divergência sem mandar agendar de novo. Não usa histórico do WhatsApp como fonte nem pede telefone de terceiros. Não cria, altera ou confirma nova reserva.',
   orientar_visita: 'Use quando o cliente pergunta se pode ir, passar na barbearia, chegar ou diz que está indo. Consulta no site os agendamentos do próprio WhatsApp e envia resposta pronta: informa a reserva existente ou explica que precisa agendar antes de ir. data é o dia mencionado (YYYY-MM-DD), ou null se não indicou dia. Agora, hoje ou estou indo significam hoje. hora é HH:MM se indicada, senão null. Não é consulta de vagas nem autorização para criar reserva. Não diga pode vir sem essa consulta atual.',
   preparar_agendamento: 'Validar catálogo e vaga real e preparar resumo para confirmação humana de QUALQUER serviço cadastrado ou vários juntos. servicos recebe TODOS os IDs escolhidos do mesmo profissional (barba, sobrancelha, hidratação, luzes, cortes ou outros). Não substitua serviços por corte, não omita itens e não acrescente extras. Use diretamente quando serviço(s), barbeiro, dia, hora e nome já foram informados, mesmo todos na primeira mensagem. Não precisa chamar grade_horarios antes. Se não houver vaga para a combinação, já busca alternativas. Não efetiva a reserva.',
   preparar_cancelamento: 'Preparar cancelamento de reserva do próprio remetente. Não cancela ainda.',
@@ -50,6 +51,11 @@ const asksForSuggestions = text => /\b(?:horarios?|vagas?|disponibilidade|dispon
 const asksForAllServices = text => /\b(?:servicos?|procedimentos?|catalogo|cardapio)\b/.test(normalize(text))
   && !/\b(?:servicos? (?:de|para) corte|somente cortes?|so cortes?)\b/.test(normalize(text));
 const asksToVisit = text => /\b(?:(?:posso|podemos|da (?:pra|para)|tem como) (?:ir|chegar|comparecer)|(?:posso|podemos) passar (?:ai|la|na barbearia)|(?:to|tou|estou|tamo|estamos) (?:indo|chegando)|(?:quero|vou) ir (?:ai|la|na barbearia)|vou (?:ai|na barbearia))\b/.test(normalize(text));
+const asksAboutBooking = text => {
+  const value = normalize(text);
+  if (/\b(?:cancelar|cancela|desmarcar|remarcar|reagendar|alterar|mudar|trocar)\b|\bnao (?:tenho|marquei|agendei)\b/.test(value)) return false;
+  return /\b(?:tenho (?:um |uma )?(?:agendamento|reserva|horario)|meu (?:agendamento|horario)|minha reserva|ja (?:marquei|agendei)|(?:estou|to) agendado|marquei (?:pelo|no) site|agendei (?:pelo|no) site)\b/.test(value);
+};
 
 function simpleVisitQuery(text, currentTime) {
   const value = normalize(text);
@@ -81,11 +87,13 @@ export class Luna {
     if (command !== null) return command;
     const pending = this.store.get('pending', phone);
     const currentTime = localTime(this.config.BARBEARIA_TIMEZONE);
-    const visitQuestion = asksToVisit(text);
+    const bookingQuestion = asksAboutBooking(text);
+    const visitQuestion = bookingQuestion || asksToVisit(text);
+    const visitTool = bookingQuestion ? 'conferir_agendamento' : 'orientar_visita';
     const visitQuery = visitQuestion ? simpleVisitQuery(text, currentTime) : null;
     if (visitQuery && this.config.BARBEARIA_API_TOKEN) {
-      try { return (await this.booking.tool('orientar_visita', visitQuery, phone)).directReply; }
-      catch { return 'Não consegui conferir seu agendamento agora. Tenta de novo em instantes antes de ir. 💈'; }
+      try { return (await this.booking.tool(visitTool, visitQuery, phone)).directReply; }
+      catch { return 'Não consegui conferir seu agendamento no site agora. Tenta de novo em instantes. 💈'; }
     }
     if (!this.client || !this.config.BARBEARIA_API_TOKEN) return `Atendimento em configuração. Use o site: ${this.config.BARBEARIA_SITE_URL}`;
     const storedHistory = this.store.get('history', phone);
@@ -121,7 +129,7 @@ export class Luna {
         ? 'Existe uma operação anterior com resultado incerto. Responda normalmente às perguntas de serviços, preços e horários usando as ferramentas de consulta. Não repita um aviso de confirmação em cada resposta. Uma nova reserva ou cancelamento fica bloqueado até recuperar o pedido anterior: quando for esse o pedido, oriente responder CONFIRMAR, sem código. Nunca afirme que já marcou.' : '';
     const instructions = `${this.prompt}\nBarbearia: ${this.config.BARBEARIA_NOME}. Dono: ${this.config.BARBEARIA_DONO}. Site: ${this.config.BARBEARIA_SITE_URL}.\nData/hora atual: ${currentTime}. Fuso: ${this.config.BARBEARIA_TIMEZONE}.\n${explicitDate ? `A mensagem atual indica o dia ${explicitDate}. Use essa data na consulta; não a substitua pela data de uma grade anterior.` : ''}\n${pendingContext}${catalogContext}${selectionContext}`;
     const teachings = knowledgeInstructions(this.store);
-    let correction = visitQuestion ? 'O cliente quer saber se pode ir à barbearia. Execute orientar_visita com o dia e hora mencionados antes de responder. Não prepare reserva nem mostre vagas nesta consulta.' : '';
+    let correction = visitQuestion ? `O cliente quer conferir uma reserva/visita. Execute ${visitTool} com o dia e hora mencionados antes de responder. Não prepare reserva nem mostre vagas nesta consulta.` : '';
     let availabilityAttempted = false;
     let appointmentsRead = false;
     for (let round = 0; round < 6; round++) {
@@ -134,7 +142,7 @@ export class Luna {
         if (response.status === 'incomplete') throw new Error('resposta_incompleta');
         const reply = response.output_text?.trim() || 'Pode repetir, por favor?';
         if (visitQuestion) {
-          correction = 'Consulte orientar_visita para conferir o agendamento desse WhatsApp antes de orientar a visita. Não suponha uma reserva a partir do histórico.';
+          correction = `Consulte ${visitTool} no site antes de responder. Não suponha uma reserva a partir do histórico.`;
           continue;
         }
         if (!appointmentsRead && (containsTime(reply) || (mentionsAvailability(reply) && !availabilityAttempted))) {
@@ -150,7 +158,7 @@ export class Luna {
         let toolName = call.name;
         try {
           let args = JSON.parse(call.arguments);
-          if (visitQuestion && toolName !== 'orientar_visita') throw new ApiError('consulte_orientar_visita', 422);
+          if (visitQuestion && toolName !== visitTool) throw new ApiError('consulte_agendamento_no_site', 422);
           // Uma pergunta geral de serviços não pode cair no filtro exclusivo de cortes.
           if (toolName === 'listar_cortes' && asksForAllServices(text)) toolName = 'listar_servicos';
           if (['grade_horarios', 'conferir_horario', 'preparar_agendamento'].includes(toolName)

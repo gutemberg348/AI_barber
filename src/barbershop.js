@@ -1,4 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises';
+import { appointmentPhoneVariants } from './phone.js';
 
 export class ApiError extends Error {
   constructor(code, status = 0, uncertain = false) {
@@ -16,6 +17,22 @@ export class BarbershopApi {
     this.sleep = sleep;
   }
   async request(action, params = {}, key) {
+    if (action !== 'agendamentos') return this.performRequest(action, params, key);
+    const variants = appointmentPhoneVariants(params.telefone);
+    if (variants.length < 2) return this.performRequest(action, params, key);
+    const results = [];
+    for (const telefone of variants) {
+      const result = await this.performRequest(action, { ...params, telefone }, key);
+      if (!Array.isArray(result.agendamentos) || typeof result.tem_mais !== 'boolean'
+        || result.agendamentos.some(item => !Number.isInteger(item?.id))) throw new ApiError('resposta_invalida', 502);
+      results.push(result);
+    }
+    const unique = new Map();
+    for (const result of results) for (const appointment of result.agendamentos) unique.set(appointment.id, appointment);
+    return { ...results[0], agendamentos: [...unique.values()].sort((a, b) => `${a.data} ${a.hora}`.localeCompare(`${b.data} ${b.hora}`)),
+      tem_mais: results.some(result => result.tem_mais) };
+  }
+  async performRequest(action, params = {}, key) {
     if (!this.config.BARBEARIA_API_TOKEN) throw new ApiError('api_nao_configurada', 503);
     const write = ['agendar', 'cancelar'].includes(action);
     if (!['catalogo', 'disponibilidade', 'agendamentos', 'agendar', 'cancelar'].includes(action)) throw new ApiError('acao_invalida');

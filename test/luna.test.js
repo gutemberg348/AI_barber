@@ -292,7 +292,7 @@ test('consulta de reservas do remetente permite informar o horário retornado se
     return { status: 'completed', output: [], output_text: appointmentReply };
   } } };
   const luna = new Luna({ config: c, store, booking: new BookingService({ store, api, config: c }), client });
-  const reply = await luna.reply('Qual o horário do meu agendamento?', phone);
+  const reply = await luna.reply('Liste minhas reservas do site, por favor.', phone);
   assert.equal(reply, appointmentReply);
   assert.equal(calls, 2);
   assert.deepEqual(api.calls.map(call => ({ action: call.action, body: call.body })), [
