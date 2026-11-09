@@ -116,7 +116,7 @@ export class MessageProcessor {
     const discarded = new Set(oldReplies.map(message => message.id));
     this.queue = this.queue.filter(message => !discarded.has(message.id));
     for (const id of discarded) this.queued.delete(id);
-    return 'Fala, meu irmão! Tudo bem? 💈';
+    return 'Olá! Tudo bem? 💈';
   }
   async process(item) {
     if (item.state !== 'reply_ready') {
@@ -158,7 +158,7 @@ export class MessageProcessor {
           }
           catch {
             this.logger.warn({ event: 'luna_failed' }, 'Consulta da Luna falhou');
-            item.reply = `Não consegui concluir agora. Tente de novo ou use o site: ${this.config.BARBEARIA_SITE_URL}`;
+            item.reply = 'Não consegui concluir esta etapa agora. Podemos tentar novamente por aqui? 💈';
           }
         }
       }

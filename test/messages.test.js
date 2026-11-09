@@ -156,7 +156,7 @@ test('nome prepara resumo, envio falho não autoriza gravação e só aceite pos
   assert.equal(store.get('pending', phone).confirmationShownAt, undefined);
   const sent = [];
   processor.setTransport(async (jid, reply) => sent.push(reply)); await idle(processor);
-  assert.match(sent[0], /Confere pra mim/);
+  assert.match(sent[0], /Confira os dados/);
   assert.match(sent[0], /Posso confirmar/);
   assert.match(sent[0], /Cliente Teste · Julio/);
   assert.match(sent[0], /Corte · R\$\s30,00/);

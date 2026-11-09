@@ -46,6 +46,9 @@ function shortReplyDate(text, currentTime) {
 const containsTime = text => /\b(?:[01]?\d|2[0-3])(?:\s*:\s*[0-5]\d|\s*h(?:[0-5]\d)?\b)/i.test(text);
 const mentionsAvailability = text => /\b(?:hor[aá]rios?|vagas?|agenda|disponibilidade|dispon[ií]ve(?:l|is))\b/i.test(text);
 const normalize = text => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+// Perguntar um dado faltante não é afirmar que existe uma vaga. A exceção
+// aceita só uma pergunta curta; horas e afirmações continuam exigindo consulta.
+const asksForMissingDetail = text => /^(?:(?:com|para|pra|em) )?qual (?:e )?(?:o |a )?(?:seu |sua )?(?:nome|servico|profissional|barbeiro|dia|data)\b[^.!?\n]*\?[^\p{L}\p{N}]*$/u.test(normalize(text).trim());
 const hasDayReference = text => /\b(?:hoje|hj|amanha|segunda|terca|quarta|quinta|sexta|sabado|domingo|semana|dia\s+\d{1,2})\b|\b\d{1,4}[/-]\d{1,2}\b|^\s*(?:0?[1-9]|[12]\d|3[01])\s*[.!?]?\s*$|\b\d{1,2}\s+de\s+(?:janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\b/.test(normalize(text));
 const asksForSuggestions = text => /\b(?:horarios?|vagas?|disponibilidade|disponivel|proxim[oa]|quando|sugest[aoe]+s?)\b/.test(normalize(text));
 const asksForAllServices = text => /\b(?:servicos?|procedimentos?|catalogo|cardapio)\b/.test(normalize(text))
@@ -53,7 +56,9 @@ const asksForAllServices = text => /\b(?:servicos?|procedimentos?|catalogo|carda
 const asksToVisit = text => /\b(?:(?:posso|podemos|da (?:pra|para)|tem como) (?:ir|chegar|comparecer)|(?:posso|podemos) passar (?:ai|la|na barbearia)|(?:to|tou|estou|tamo|estamos) (?:indo|chegando)|(?:quero|vou) ir (?:ai|la|na barbearia)|vou (?:ai|na barbearia))\b/.test(normalize(text));
 const asksAboutBooking = text => {
   const value = normalize(text);
-  if (/\b(?:cancelar|cancela|desmarcar|remarcar|reagendar|alterar|mudar|trocar)\b|\bnao (?:tenho|marquei|agendei)\b/.test(value)) return false;
+  // "Agenda meu horário" pede uma nova marcação; a posse do horário, sozinha,
+  // não comprova que o cliente esteja consultando uma reserva existente.
+  if (/\b(?:agende|agendar|marque|marcar|reserve|reservar|cancelar|cancela|desmarcar|remarcar|reagendar|alterar|mudar|trocar)\b|\b(?:agenda|marca|coloca|coloque|colocar)\s+(?:(?:o|um|meu|esse|outro)\s+)*(?:horario|agendamento)\b|\bnao (?:tenho|marquei|agendei)\b/.test(value)) return false;
   return /\b(?:tenho (?:um |uma )?(?:agendamento|reserva|horario)|meu (?:agendamento|horario)|minha reserva|ja (?:marquei|agendei)|(?:estou|to) agendado|marquei (?:pelo|no) site|agendei (?:pelo|no) site)\b/.test(value);
 };
 
@@ -77,8 +82,8 @@ function chosenTime(text) {
 }
 
 export class Luna {
-  constructor({ config, store, booking, client }) {
-    Object.assign(this, { config, store, booking });
+  constructor({ config, store, booking, client, logger }) {
+    Object.assign(this, { config, store, booking, logger });
     this.prompt = readFileSync(config.LUNA_PROMPT_PATH, 'utf8');
     this.client = client ?? (config.OPENAI_API_KEY ? new OpenAI({ apiKey: config.OPENAI_API_KEY, timeout: 45000, maxRetries: 1 }) : null);
   }
@@ -93,7 +98,7 @@ export class Luna {
     const visitQuery = visitQuestion ? simpleVisitQuery(text, currentTime) : null;
     if (visitQuery && this.config.BARBEARIA_API_TOKEN) {
       try { return (await this.booking.tool(visitTool, visitQuery, phone)).directReply; }
-      catch { return 'Não consegui conferir seu agendamento no site agora. Tenta de novo em instantes. 💈'; }
+      catch { return 'Não consegui conferir seu agendamento no site agora. Tente novamente em instantes. 💈'; }
     }
     if (!this.client || !this.config.BARBEARIA_API_TOKEN) return `Atendimento em configuração. Use o site: ${this.config.BARBEARIA_SITE_URL}`;
     const storedHistory = this.store.get('history', phone);
@@ -145,7 +150,7 @@ export class Luna {
           correction = `Consulte ${visitTool} no site antes de responder. Não suponha uma reserva a partir do histórico.`;
           continue;
         }
-        if (!appointmentsRead && (containsTime(reply) || (mentionsAvailability(reply) && !availabilityAttempted))) {
+        if (!appointmentsRead && (containsTime(reply) || (mentionsAvailability(reply) && !availabilityAttempted && !asksForMissingDetail(reply)))) {
           correction = 'A resposta anterior foi descartada: falou de horários ou disponibilidade sem resultado que a sustente. Não copie ou renomeie datas da grade do histórico, nem diga que uma consulta falhou sem tê-la executado. Para mostrar vagas, execute grade_horarios agora com o dia pedido (ou null se pediu sugestões sem dia). Se faltam serviço ou profissional, pergunte apenas o dado que falta. Se já escolheu horário, peça só o nome caso falte ou use preparar_agendamento, que revalida. Não repita a hora em texto livre.';
           continue;
         }
@@ -170,7 +175,7 @@ export class Luna {
               if (!barber || query.servicos.some(id => !barber.servicos?.some(service => service.id === id))) throw new ApiError('dados_invalidos', 422);
               metadata.catalog = catalog;
               metadata.scheduleSelection = { ...query, data: null, ...(explicitTime ? { hora: explicitTime } : {}) };
-              return 'Pra qual dia? 📅';
+              return 'Para qual dia? 📅';
             }
             // Pedido de sugestões sem data usa a janela, não um dia escolhido pelo modelo.
             args.data = null;
@@ -211,7 +216,8 @@ export class Luna {
         input.push({ type: 'function_call_output', call_id: call.call_id, output: JSON.stringify(result) });
       }
     }
-    return `Não consegui concluir a consulta. Tente de novo ou use o site: ${this.config.BARBEARIA_SITE_URL}`;
+    this.logger?.warn({ event: 'luna_turn_limit', rounds: 6 }, 'Limite de etapas da resposta atingido');
+    return 'Não consegui concluir esta etapa agora. Podemos tentar novamente por aqui? 💈';
   }
   remember(phone, text, reply, metadata = {}) {
     const old = this.store.get('history', phone);

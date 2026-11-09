@@ -42,7 +42,7 @@ async function main() {
     store.set('system', 'site-url', config.BARBEARIA_API_URL);
     const api = new BarbershopApi(config);
     const booking = new BookingService({ store, api, config, logger });
-    const luna = new Luna({ config, store, booking });
+    const luna = new Luna({ config, store, booking, logger });
     processor = new MessageProcessor({ store, luna, config, logger });
     whatsapp = new WhatsAppManager({ store, config, processor, logger });
     app = await buildApp({ config, whatsapp, api, store, logger });

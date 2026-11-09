@@ -42,7 +42,7 @@ export function apiFailure(error) {
     dados_invalidos: 'O site não aceitou esses dados. Vamos conferir?',
     periodo_invalido: 'Essa data está fora da agenda liberada. Qual outro dia?',
   };
-  return messages[error.code] ?? 'Não consegui consultar o site agora. Tenta de novo em instantes.';
+  return messages[error.code] ?? 'Não consegui consultar o site agora. Tente novamente em instantes.';
 }
 
 const clean = value => String(value ?? '').replace(/[\r\n\x00-\x1f]/g, ' ').slice(0, 120);
@@ -98,7 +98,7 @@ export class BookingService {
       action = 'agendar';
       payload = { ...args, telefone: phone };
       const total = selected.reduce((sum, s) => sum + Math.round(Number(s.preco) * 100), 0) / 100;
-      summary = `Confere pra mim: ✂️\n${clean(args.nome)} · ${clean(barber.nome)}\n${selected.map(s => clean(s.nome)).join(' + ')} · ${money(total)} (avulso)\n${args.data.split('-').reverse().join('/')} às ${args.hora} · horário da barbearia\nAinda não reservado.`;
+      summary = `Confira os dados: ✂️\n${clean(args.nome)} · ${clean(barber.nome)}\n${selected.map(s => clean(s.nome)).join(' + ')} · ${money(total)} (avulso)\n${args.data.split('-').reverse().join('/')} às ${args.hora} · horário da barbearia\nAinda não reservado.`;
     } else {
       let appointment;
       for (let page = 1; page <= 20; page++) {
@@ -134,7 +134,7 @@ export class BookingService {
     // O erro salvo pode ser anterior à correção do site. Mostre o pedido original
     // sem afirmar que continua falhando ou que a operação não chegou a ser gravada.
     const details = typeof op.summary === 'string'
-      ? op.summary.replace(/^Confere pra mim: ✂️\n/, '').replace(/\nAinda não (?:reservado|cancelada)\.$/, '')
+      ? op.summary.replace(/^(?:Confere pra mim|Confira os dados): ✂️\n/, '').replace(/\nAinda não (?:reservado|cancelada)\.$/, '')
       : '';
     return `Pedido anterior aguardando resultado.${details ? `\n\n${details}` : ''}\n\nAinda não recebi o resultado desse pedido. Posso tentar confirmar esse mesmo pedido? Responda SIM ou CONFIRMAR.\nPreciso resolver esse pedido antes de criar ou cancelar outro. Você pode continuar vendo serviços e horários. 💈`;
   }
@@ -147,8 +147,8 @@ export class BookingService {
       if (reason === 'periodo_invalido') return updated.directReply;
       return `Esse horário ficou indisponível.\n\n${updated.directReply}`;
     } catch {
-      if (reason === 'periodo_invalido') return 'Esse dia está fora da agenda liberada. Não consegui consultar as próximas vagas agora. Tenta de novo em instantes.';
-      return 'Esse horário ficou indisponível. Não consegui atualizar as vagas agora. Tenta de novo em instantes.';
+      if (reason === 'periodo_invalido') return 'Esse dia está fora da agenda liberada. Não consegui consultar as próximas vagas agora. Tente novamente em instantes.';
+      return 'Esse horário ficou indisponível. Não consegui atualizar as vagas agora. Tente novamente em instantes.';
     }
   }
   async command(text, phone, metadata = {}) {
@@ -197,8 +197,8 @@ export class BookingService {
       if (!Number.isInteger(result.agendamento?.id) || (op.action === 'cancelar' && result.agendamento.status !== 'cancelado')) throw new ApiError('resposta_invalida', 502, true);
       const appointment = result.agendamento;
       const message = op.action === 'cancelar'
-        ? `Cancelamento registrado para a reserva #${appointment.id}. ✅ Tamo junto!`
-        : `Reserva #${appointment.id} registrada! ✅\n${clean(appointment.barbeiro)} · ${clean(appointment.data)} às ${clean(appointment.hora)}\n${money(appointment.valor_total)} · ${clean(appointment.status)}\nTamo junto!`;
+        ? `Cancelamento registrado para a reserva #${appointment.id}. ✅💈`
+        : `Reserva #${appointment.id} registrada! ✅\n${clean(appointment.barbeiro)} · ${clean(appointment.data)} às ${clean(appointment.hora)}\n${money(appointment.valor_total)} · ${clean(appointment.status)}\nAté lá! 💈`;
       // Mantém o resultado junto à confirmação até o chamador persistir a resposta.
       op.state = 'completed'; op.result = result; op.reply = message;
       this.store.set('pending', phone, op);

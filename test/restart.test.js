@@ -37,7 +37,7 @@ test('/iniciar limpa contexto e confirmação só do remetente e funciona durant
   store.set('auth', 'creds', { marker: 'sessao_preservada' });
   const callsBefore = api.calls.length;
   processor.accept(item('reset', '  /INICIAR  ')); await idle(processor);
-  assert.equal(sent[0].text, 'Fala, meu irmão! Tudo bem? 💈');
+  assert.equal(sent[0].text, 'Olá! Tudo bem? 💈');
   assert.equal(modelCalls.length, 0); assert.equal(api.calls.length, callsBefore);
   assert.equal(store.get('pending', phone), null); assert.equal(store.get('paused', phone), null);
   assert.equal(store.get('history', phone).messages.length, 2);
@@ -94,7 +94,7 @@ test('/iniciar remove respostas antigas pendentes e não as reenvia ao reconecta
   const old = { ...item('old', 'Quais horários?'), state: 'reply_ready', reply: 'GRADE ANTIGA', replyGeneratedAt: Date.now() };
   store.set('inbound', old.id, old); processor.enqueue(old);
   processor.setTransport(async (jid, text) => sent.push({ jid, text })); await idle(processor);
-  assert.equal(sent.length, 1); assert.equal(sent[0].text, 'Fala, meu irmão! Tudo bem? 💈');
+  assert.equal(sent.length, 1); assert.equal(sent[0].text, 'Olá! Tudo bem? 💈');
   assert.equal(store.get('inbound', 'old'), null);
   assert.equal(store.get('processed', 'old').state, 'ignored');
   processor.setTransport(processor.send); await idle(processor);

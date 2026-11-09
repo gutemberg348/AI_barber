@@ -76,7 +76,7 @@ export function haircutListReply(catalog, barberId = null) {
 
 export function barberListReply(catalog) {
   const barbers = catalog.barbeiros ?? [];
-  if (!barbers.length) return 'Não encontrei barbeiros cadastrados nessa consulta. Tenta de novo em instantes. 💈';
+  if (!barbers.length) return 'Não encontrei barbeiros cadastrados nessa consulta. Tente novamente em instantes. 💈';
   return `Temos estes barbeiros:\n\n${barbers.map(barber => `${clean(barber.nome)} 💈`).join('\n')}\n\nCom quem você prefere? 💈`;
 }
 
