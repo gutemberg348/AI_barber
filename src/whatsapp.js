@@ -1,4 +1,4 @@
-import makeWASocket, { Browsers, DisconnectReason } from '@whiskeysockets/baileys';
+import makeWASocket, { Browsers, DisconnectReason, downloadMediaMessage } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import QRCode from 'qrcode';
 import { sqliteAuthState } from './auth-state.js';
@@ -99,6 +99,11 @@ export class WhatsAppManager {
       this.processor.setTransport(async (jid, text) => {
         if (this.socket !== socket || this.state !== 'connected') throw new Error('WhatsApp desconectado');
         await socket.sendMessage(jid, { text });
+      }, async (audio, signal) => {
+        if (this.socket !== socket || this.state !== 'connected') throw new Error('WhatsApp desconectado');
+        return downloadMediaMessage(audio, 'stream', { options: { signal } }, {
+          logger: pino({ level: 'silent' }), reuploadRequest: message => socket.updateMediaMessage(message),
+        });
       });
       this.logger.info({ event: 'whatsapp_connected' }, 'WhatsApp conectado');
     }

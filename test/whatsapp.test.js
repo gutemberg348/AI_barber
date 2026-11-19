@@ -8,7 +8,7 @@ import { config, logger, memoryStore } from './helpers.js';
 function setup(t) {
   const store = memoryStore();
   const sockets = [];
-  const processor = { setTransport(send) { this.send = send; }, accept() {} };
+  const processor = { setTransport(send, downloadAudio) { this.send = send; this.downloadAudio = downloadAudio; }, accept() {} };
   const manager = new WhatsAppManager({ store, config: config(), processor, logger,
     socketFactory(options) {
       const socket = { ev: new EventEmitter(), options, end() {}, async logout() {}, async sendMessage() {} };
@@ -31,6 +31,7 @@ test('connect é idempotente; QR expira e desaparece ao conectar; disconnect pre
   await manager.onUpdate({ connection: 'open' }, sockets[0]);
   assert.equal(manager.status().connected, true); assert.equal(manager.status().qrAvailable, false);
   assert.equal(typeof processor.send, 'function');
+  assert.equal(typeof processor.downloadAudio, 'function');
   await manager.disconnect();
   assert.equal(manager.status().connected, false); assert.ok(store.get('auth', 'creds'));
   sockets[0].ev.emit('connection.update', { connection: 'open' });

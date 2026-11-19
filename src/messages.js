@@ -1,5 +1,7 @@
 import { jidNormalizedUser, normalizeMessageContent } from '@whiskeysockets/baileys';
 import { botEnabled } from './bot-control.js';
+import { audioFailureReply } from './audio.js';
+import { contactControl, recordContact } from './contacts.js';
 
 export function phoneFromJid(jid) {
   if (!jid || !jid.endsWith('@s.whatsapp.net')) return null;
@@ -22,12 +24,23 @@ export async function incomingMessage(message, socket, config) {
   const text = content.conversation ?? content.extendedTextMessage?.text;
   const media = content.audioMessage || content.imageMessage || content.videoMessage || content.documentMessage || content.stickerMessage;
   if (!text && !media) return null;
-  return { id: `${phone ?? jid}:${message.key.id}`, jid, phone, text: text ?? '', unsupported: !text, createdAt: Date.now() };
+  const audio = !text && content.audioMessage ? {
+    key: { id: message.key.id, remoteJid: jid, fromMe: false, ...(message.key.remoteJidAlt ? { remoteJidAlt: message.key.remoteJidAlt } : {}) },
+    message: { audioMessage: {
+      url: content.audioMessage.url, directPath: content.audioMessage.directPath,
+      mediaKey: content.audioMessage.mediaKey ? Buffer.from(content.audioMessage.mediaKey) : undefined,
+      fileSha256: content.audioMessage.fileSha256 ? Buffer.from(content.audioMessage.fileSha256) : undefined,
+      fileEncSha256: content.audioMessage.fileEncSha256 ? Buffer.from(content.audioMessage.fileEncSha256) : undefined,
+      fileLength: Number(content.audioMessage.fileLength ?? 0), seconds: Number(content.audioMessage.seconds ?? 0),
+      mimetype: content.audioMessage.mimetype, ptt: Boolean(content.audioMessage.ptt),
+    } },
+  } : null;
+  return { id: `${phone ?? jid}:${message.key.id}`, jid, phone, text: text ?? '', unsupported: !text && !audio, ...(audio ? { audio } : {}), createdAt: Date.now() };
 }
 
 export class MessageProcessor {
-  constructor({ store, luna, config, logger }) {
-    Object.assign(this, { store, luna, config, logger });
+  constructor({ store, luna, config, logger, transcriber }) {
+    Object.assign(this, { store, luna, config, logger, transcriber });
     this.queue = [];
     this.queued = new Set();
     this.busy = new Set();
@@ -35,8 +48,10 @@ export class MessageProcessor {
     this.send = null;
     this.running = false;
   }
-  setTransport(send) {
+  setTransport(send, downloadAudio) {
     this.send = send;
+    if (!send) this.downloadAudio = null;
+    else if (downloadAudio) this.downloadAudio = downloadAudio;
     this.running = Boolean(send);
     if (send) {
       for (const item of this.store.entries('inbound')) {
@@ -63,6 +78,8 @@ export class MessageProcessor {
         this.finish(item);
         return;
       }
+      const contact = recordContact(this.store, item.phone);
+      item.contactRevision = contact?.revision ?? 0;
     }
     this.store.set('inbound', item.id, item);
     this.enqueue(item);
@@ -118,20 +135,47 @@ export class MessageProcessor {
     for (const id of discarded) this.queued.delete(id);
     return 'Olá! Tudo bem? 💈';
   }
+  discardForContact(item) {
+    const contact = item.phone ? contactControl(this.store, item.phone) : null;
+    if (contact?.enabled !== false && (item.contactRevision ?? 0) === (contact?.revision ?? 0)) return false;
+    // A pausa invalida respostas antigas, inclusive se já foi retomado durante a geração.
+    // Reservas/operações pendentes permanecem intactas.
+    item.state = 'ignored';
+    this.finish(item);
+    return true;
+  }
   async process(item) {
+    if (this.discardForContact(item)) return;
     if (item.state !== 'reply_ready') {
-      const command = item.text.trim().toLowerCase();
+      let command = item.text.trim().toLowerCase();
       if (!botEnabled(this.store, this.config.BARBEARIA_TIMEZONE) || (item.phone && this.store.get('paused', item.phone) && !['/voltar', '/parar', '/iniciar'].includes(command))) {
         item.state = 'ignored';
         this.finish(item);
         return;
       }
+      if (item.audio && item.phone && !item.unsupported && Date.now() - item.createdAt <= 3600000) {
+        try {
+          if (!this.transcriber) throw new Error('audio_unavailable');
+          item.text = await this.transcriber.transcribe(item.audio, this.downloadAudio);
+        } catch (error) {
+          item.audioReply = audioFailureReply(error, this.config);
+          // Não registrar exceções do SDK, mídia, telefone ou transcrição.
+          this.logger.warn({ event: 'audio_transcription_failed' }, 'Não foi possível interpretar o áudio');
+        }
+        delete item.audio;
+        // Após reinício, reutiliza a transcrição concluída antes de executar o agente.
+        this.store.set('inbound', item.id, item);
+        command = item.text.trim().toLowerCase();
+      }
+      if (this.discardForContact(item)) return;
       if (Date.now() - item.createdAt > 3600000) {
         item.reply = 'A conexão caiu. Pode mandar seu pedido de novo?';
       } else if (!item.phone) {
         item.reply = `Não consegui identificar seu número. Use o site: ${this.config.BARBEARIA_SITE_URL}`;
+      } else if (item.audioReply) {
+        item.reply = item.audioReply;
       } else if (item.unsupported) {
-        item.reply = 'Atendo só por texto. Pode escrever seu pedido? ✂️';
+        item.reply = 'Pode enviar seu pedido por texto ou áudio? Não consigo interpretar esse tipo de mensagem. 💈';
       } else {
         if (command === '/iniciar') {
           item.reply = this.restartConversation(item);
@@ -162,6 +206,7 @@ export class MessageProcessor {
           }
         }
       }
+      if (this.discardForContact(item)) return;
       item.state = 'reply_ready';
       item.replyGeneratedAt = Date.now();
       // Resposta e histórico persistem juntos, antes de enviar ao WhatsApp.
@@ -172,6 +217,7 @@ export class MessageProcessor {
         });
       });
     }
+    if (this.discardForContact(item)) return;
     if (!this.running || !this.send || !botEnabled(this.store, this.config.BARBEARIA_TIMEZONE)) return;
     // Uma grade enfileirada pode ter mudado durante a queda da conexão.
     // Reconsultar apenas disponibilidade: nunca reexecutar o agendamento.
@@ -186,6 +232,7 @@ export class MessageProcessor {
         this.luna.replaceHistoricalReply(item.phone, previous, item.reply);
       });
     }
+    if (this.discardForContact(item)) return;
     if (!this.running || !this.send || !botEnabled(this.store, this.config.BARBEARIA_TIMEZONE)) return;
     try {
       item.sendAttempted = true;

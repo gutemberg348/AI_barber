@@ -7,6 +7,7 @@ import { Store } from './store.js';
 import { BarbershopApi } from './barbershop.js';
 import { BookingService } from './booking.js';
 import { Luna } from './luna.js';
+import { AudioTranscriber } from './audio.js';
 import { MessageProcessor } from './messages.js';
 import { WhatsAppManager } from './whatsapp.js';
 import { buildApp } from './app.js';
@@ -43,7 +44,8 @@ async function main() {
     const api = new BarbershopApi(config);
     const booking = new BookingService({ store, api, config, logger });
     const luna = new Luna({ config, store, booking, logger });
-    processor = new MessageProcessor({ store, luna, config, logger });
+    const transcriber = new AudioTranscriber({ config });
+    processor = new MessageProcessor({ store, luna, config, logger, transcriber });
     whatsapp = new WhatsAppManager({ store, config, processor, logger });
     app = await buildApp({ config, whatsapp, api, store, logger });
     await app.listen({ host: config.HOST, port: config.PORT });

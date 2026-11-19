@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { pauseSettings } from './bot-control.js';
+import { saveContact, listedContacts } from './contacts.js';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 const lessonSchema = z.object({
@@ -87,6 +88,14 @@ export async function registerPanel(app, { config, store, fullStatus, sessions }
     };
   });
   app.get('/api/v1/panel/teachings', async () => knowledge(store));
+  app.get('/api/v1/panel/contacts', async () => ({ contacts: listedContacts(store) }));
+  app.put('/api/v1/panel/contacts/:phone', async (request, reply) => {
+    const parsed = z.object({ enabled: z.boolean(), name: z.string().trim().max(80).optional() }).strict().safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'contato_invalido' });
+    const result = saveContact(store, request.params.phone, parsed.data);
+    if (!result) return reply.code(400).send({ error: 'numero_invalido' });
+    return result;
+  });
   app.put('/api/v1/panel/teachings', { bodyLimit: 100000 }, async (request, reply) => {
     const parsed = knowledgeSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: 'ensinamentos_invalidos' });

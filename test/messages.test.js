@@ -27,7 +27,9 @@ test('LID resolve somente por metadado/mapeamento verificado; não usa número e
   assert.equal(mapped.phone, phone);
   const direct = await incomingMessage(msg(), {}, c);
   assert.equal(direct.id, mapped.id);
-  assert.equal((await incomingMessage(msg({ message: { audioMessage: { mimetype: 'audio/ogg' } } }), {}, c)).unsupported, true);
+  const audio = await incomingMessage(msg({ message: { audioMessage: { mimetype: 'audio/ogg' } } }), {}, c);
+  assert.equal(audio.unsupported, false);
+  assert.equal(audio.audio.message.audioMessage.mimetype, 'audio/ogg');
 });
 
 test('fila serial por telefone, deduplicação persistente e reenvio não repete chamada da IA', async t => {

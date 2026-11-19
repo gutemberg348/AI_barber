@@ -1,12 +1,14 @@
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const pages = { overview: 'Visão geral', connection: 'WhatsApp', teachings: 'Ensinamentos', settings: 'Configurações' };
+const pages = { overview: 'Visão geral', connection: 'WhatsApp', contacts: 'Conversas', teachings: 'Ensinamentos', settings: 'Configurações' };
 const categories = { atendimento: 'Atendimento', informacoes: 'Informações', regras: 'Regras' };
 const stateNames = { connected: 'Conectado', qr: 'Aguardando leitura', connecting: 'Conectando', reconnecting: 'Reconectando', disconnected: 'Desconectado', logged_out: 'Sem vínculo', error: 'Atenção na conexão' };
 let authenticated = false, overview = null, teachings = { revision: 0, lessons: [] }, editingId = null;
 let pollTimer, toastTimer, qrExpiry = 0, fetching = false, mutating = false, fresh = false, sessionEpoch = 0;
 let currentPage = 'overview';
 let scheduleDirty = false;
+let contacts = [], contactsFresh = false, contactsLoading = false, contactSaving = false;
+let contactsGeneration = 0;
 
 function toast(message, error = false) {
   clearTimeout(toastTimer); $('#toast').textContent = message; $('#toast').classList.toggle('error', error); $('#toast').hidden = false;
@@ -17,6 +19,7 @@ function showLogin() {
   scheduleDirty = false;
   authenticated = false; sessionEpoch++; fresh = false; overview = null; clearTimeout(pollTimer); resetQr();
   teachings = { revision: 0, lessons: [] }; $('#lesson-list').replaceChildren();
+  contactsGeneration++; contacts = []; contactsFresh = false; $('#contact-list').replaceChildren(); $('#contact-form').reset(); $('#contact-search').value = ''; $('#contact-filter').value = 'all';
   $$('dialog[open]').forEach(dialog => dialog.close());
   $('#workspace').hidden = true; $('#login-screen').hidden = false; $('#login-password').value = '';
 }
@@ -31,7 +34,8 @@ async function api(path, options = {}) {
     if (!response.ok) {
       if (response.status === 401 && authenticated) { showLogin(); toast('Sua sessão terminou. Entre novamente.'); }
       const messages = { 401: 'E-mail ou senha inválidos. Confira e tente novamente.', 409: 'Os ensinamentos mudaram em outra sessão. A lista foi atualizada; confira antes de salvar novamente.', 429: 'Muitas tentativas. Aguarde um minuto e tente novamente.', 400: 'Confira os campos. Use até 30 ensinamentos e 18.000 caracteres no total.' };
-      throw Object.assign(new Error(messages[response.status] ?? 'Não foi possível concluir. Tente novamente em instantes.'), { status: response.status, code: data.error });
+      const contactErrors = { numero_invalido: 'Informe um número brasileiro válido com DDD.', contato_invalido: 'Confira o nome e o estado do interruptor.' };
+      throw Object.assign(new Error(contactErrors[data.error] ?? messages[response.status] ?? 'Não foi possível concluir. Tente novamente em instantes.'), { status: response.status, code: data.error });
     }
     return data;
   } catch (error) {
@@ -100,6 +104,7 @@ async function refresh() {
     if (!authenticated || epoch !== sessionEpoch) return;
     overview = data; fresh = true; $('#offline-banner').hidden = true;
     $('#live-indicator').textContent = 'Atualizado agora'; $('#live-indicator').className = 'live-indicator fresh'; renderStatus();
+    if (currentPage === 'contacts' && !document.hidden) await loadContacts();
     if (currentPage === 'connection' && data.status.qrAvailable && !data.status.connected && !document.hidden) {
       try {
         const qr = await api('whatsapp/qrcode');
@@ -125,6 +130,62 @@ function navigate() {
   window.scrollTo({ top: 0 });
 }
 function node(tag, className, text) { const element = document.createElement(tag); if (className) element.className = className; if (text !== undefined) element.textContent = text; return element; }
+function formatPhone(value) { return value.replace(/^(\d{2})(\d{4,5})(\d{4})$/, '($1) $2-$3'); }
+function renderContacts() {
+  const query = $('#contact-search').value.trim().toLocaleLowerCase('pt-BR'); const digits = query.replace(/\D/g, ''); const filter = $('#contact-filter').value;
+  const filtered = contacts.filter(item => (filter === 'all' || (filter === 'enabled') === item.enabled)
+    && (!query || item.name.toLocaleLowerCase('pt-BR').includes(query) || (digits && (`55${item.phone}`).includes(digits))));
+  $('#contacts-paused-count').textContent = `${contacts.filter(item => !item.enabled).length} com IA pausada`;
+  $('#contact-count').textContent = `${filtered.length} de ${contacts.length} conversa(s)`;
+  $('#contact-empty').hidden = !contactsFresh || filtered.length > 0;
+  $('#save-contact').disabled = contactSaving || !authenticated;
+  $('#reload-contacts').disabled = contactsLoading || contactSaving;
+  const focused = document.activeElement?.dataset.contactPhone;
+  const list = $('#contact-list'); list.replaceChildren();
+  for (const item of filtered) {
+    const card = node('article', `contact-row${item.enabled ? '' : ' manual'}`); const info = node('div', 'contact-info');
+    info.append(node('strong', '', item.name || formatPhone(item.phone)));
+    if (item.name) info.append(node('span', 'contact-number', formatPhone(item.phone)));
+    info.append(node('small', '', item.enabled ? 'IA habilitada' : 'Atendimento manual · IA pausada'));
+    const control = node('div', 'contact-control'); const toggle = node('button', 'switch'); toggle.type = 'button';
+    toggle.dataset.contactPhone = item.phone; toggle.setAttribute('role', 'switch'); toggle.setAttribute('aria-checked', String(item.enabled));
+    toggle.setAttribute('aria-label', `${item.enabled ? 'Pausar' : 'Retomar'} IA para ${item.name || formatPhone(item.phone)}`);
+    toggle.disabled = contactSaving || !contactsFresh; toggle.append(node('span'));
+    toggle.addEventListener('click', () => void updateContact(item.phone, { enabled: !item.enabled }));
+    control.append(node('span', '', item.enabled ? 'Ligada' : 'Pausada'), toggle); card.append(info, control); list.append(card);
+    if (focused === item.phone) toggle.focus({ preventScroll: true });
+  }
+}
+async function loadContacts() {
+  if (!authenticated || contactsLoading || contactSaving) return;
+  contactsLoading = true; const epoch = sessionEpoch; const generation = contactsGeneration;
+  try {
+    const result = await api('panel/contacts');
+    if (!authenticated || epoch !== sessionEpoch || generation !== contactsGeneration) return;
+    contacts = result.contacts; contactsFresh = true; $('#contacts-error').hidden = true;
+  } catch (error) {
+    if (authenticated && epoch === sessionEpoch && generation === contactsGeneration) { contactsFresh = false; $('#contacts-error').textContent = error.message; $('#contacts-error').hidden = false; }
+  } finally {
+    contactsLoading = false;
+    if (authenticated && epoch === sessionEpoch) { renderContacts(); if (generation !== contactsGeneration) void loadContacts(); }
+  }
+}
+async function updateContact(phone, data, fromForm = false) {
+  if (!authenticated || contactSaving) return;
+  contactSaving = true; contactsGeneration++; const epoch = sessionEpoch; renderContacts(); $('#contact-error').hidden = true;
+  try {
+    const result = await api(`panel/contacts/${encodeURIComponent(phone)}`, { method: 'PUT', body: JSON.stringify(data) });
+    if (!authenticated || epoch !== sessionEpoch) return;
+    contacts = [result, ...contacts.filter(item => item.phone !== result.phone)];
+    if (fromForm) $('#contact-form').reset();
+    toast(result.enabled ? 'IA retomada para este número.' : 'IA pausada. Você pode atender pelo WhatsApp.');
+  } catch (error) {
+    if (authenticated && epoch === sessionEpoch) {
+      if (fromForm) { $('#contact-error').textContent = error.message; $('#contact-error').hidden = false; }
+      else toast(error.message, true);
+    }
+  } finally { contactSaving = false; if (authenticated && epoch === sessionEpoch) { await loadContacts(); renderContacts(); } }
+}
 function renderTeachings() {
   const query = $('#lesson-search').value.toLocaleLowerCase('pt-BR'); const category = $('#lesson-filter').value;
   const filtered = teachings.lessons.filter(item => (category === 'all' || item.category === category) && `${item.title} ${item.content}`.toLocaleLowerCase('pt-BR').includes(query));
@@ -199,6 +260,13 @@ $('#login-form').addEventListener('submit', async event => {
   try { await api('panel/session', { method: 'POST', body: JSON.stringify({ email, password }) }); await enter(); }
   catch (error) { $('#login-error').textContent = error.message; $('#login-error').hidden = false; }
   finally { $('#login-button').disabled = false; }
+});
+$('#contact-search').addEventListener('input', renderContacts);
+$('#contact-filter').addEventListener('change', renderContacts);
+$('#reload-contacts').addEventListener('click', () => void loadContacts());
+$('#contact-form').addEventListener('submit', event => {
+  event.preventDefault(); const name = $('#contact-name').value.trim();
+  void updateContact($('#contact-phone').value.trim(), { enabled: false, ...(name ? { name } : {}) }, true);
 });
 $$('[data-toggle-bot]').forEach(button => button.addEventListener('click', () => void mutate(() => api('bot', { method: 'PUT', body: JSON.stringify({ enabled: !overview.status.botEnabled }) }), overview.status.botEnabled ? 'Agente IA BARBER desligado.' : 'Agente IA BARBER ligado.')));
 $('#pause-time').addEventListener('input', () => { scheduleDirty = true; });

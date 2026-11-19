@@ -107,5 +107,38 @@
   .schedule-timezone { font-size: 10px; }
   .stat-top, .stat-card>small { font-size: 11px; }
   .integration-row small { font-size: 10px; }
-  .mobile-nav a { font-size: 10px; }
+  .mobile-nav a { font-size: 10px; min-width: 0; flex: 1; padding: 8px 5px; }
+}
+.contacts-layout { display: grid; grid-template-columns: minmax(245px, .8fr) minmax(0, 1.5fr); gap: 24px; align-items: start; }
+.contact-add-card { position: sticky; top: 20px; }
+.contact-add-card h2 { margin-top: 20px; }
+.contact-add-card p { font-size: 12px; }
+.contact-add-card label { font-size: 12px; }
+.contact-add-card .button { margin: 18px 0; }
+.contact-add-card .soft-note { margin-top: 4px; font-size: 11px; }
+.contacts-main { min-width: 0; }
+.contact-list { display: grid; gap: 12px; }
+.contact-row { padding: 20px; background: var(--paper); border: 1px solid var(--line); border-radius: 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.contact-row.manual { background: #fbfaf5; border-color: #e6dfcb; }
+.contact-info { display: grid; gap: 7px; min-width: 0; }
+.contact-info strong { font-size: 14px; overflow-wrap: anywhere; }
+.contact-number { color: var(--muted); font-size: 12px; }
+.contact-info small { font-size: 11px; color: #60804c; }
+.contact-row.manual small { color: #917442; }
+.contact-control { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.contact-control>span { font-size: 11px; color: var(--muted); }
+.contact-control .switch { box-sizing: content-box; padding: 10px 3px; background-clip: content-box; }
+.contacts-main .list-meta button { border: 0; background: none; font: inherit; padding: 0; }
+@media (max-width: 1100px) {
+  .contacts-layout { grid-template-columns: 1fr; gap: 22px; }
+  .contact-add-card { position: static; order: 2; }
+  .contacts-main { order: 1; }
+}
+@media (max-width: 680px) {
+  .contacts-layout { gap: 20px; }
+  .contact-add-card input { font-size: 16px; }
+  .contact-row { padding: 16px; gap: 10px; }
+  .contact-control { flex-direction: column; gap: 0; }
+  .contact-control>span { font-size: 10px; }
+  .contacts-main .teaching-toolbar select { width: 130px; }
 }
