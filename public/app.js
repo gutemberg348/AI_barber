@@ -6,6 +6,7 @@ const stateNames = { connected: 'Conectado', qr: 'Aguardando leitura', connectin
 let authenticated = false, overview = null, teachings = { revision: 0, lessons: [] }, editingId = null;
 let pollTimer, toastTimer, qrExpiry = 0, fetching = false, mutating = false, fresh = false, sessionEpoch = 0;
 let currentPage = 'overview';
+let stagesLoaded = false, stagesRequest = null;
 let scheduleDirty = false;
 let contacts = [], contactsFresh = false, contactsLoading = false, contactSaving = false;
 let contactsGeneration = 0;
@@ -16,6 +17,7 @@ function toast(message, error = false) {
 }
 function resetQr() { qrExpiry = 0; $('#qr-image').hidden = true; $('#qr-image').removeAttribute('src'); $('#qr-placeholder').hidden = false; }
 function showLogin() {
+  stagesLoaded = false; stagesRequest = null; $('#stage-list').replaceChildren();
   scheduleDirty = false;
   authenticated = false; sessionEpoch++; fresh = false; overview = null; clearTimeout(pollTimer); resetQr();
   teachings = { revision: 0, lessons: [] }; $('#lesson-list').replaceChildren();
@@ -35,7 +37,8 @@ async function api(path, options = {}) {
       if (response.status === 401 && authenticated) { showLogin(); toast('Sua sessão terminou. Entre novamente.'); }
       const messages = { 401: 'E-mail ou senha inválidos. Confira e tente novamente.', 409: 'Os ensinamentos mudaram em outra sessão. A lista foi atualizada; confira antes de salvar novamente.', 429: 'Muitas tentativas. Aguarde um minuto e tente novamente.', 400: 'Confira os campos. Use até 30 ensinamentos e 18.000 caracteres no total.' };
       const contactErrors = { numero_invalido: 'Informe um número brasileiro válido com DDD.', contato_invalido: 'Confira o nome e o estado do interruptor.' };
-      throw Object.assign(new Error(contactErrors[data.error] ?? messages[response.status] ?? 'Não foi possível concluir. Tente novamente em instantes.'), { status: response.status, code: data.error });
+      const message = data.error === 'etapa_invalida' ? 'Use entre 1 e 700 caracteres na orientação.' : contactErrors[data.error] ?? messages[response.status];
+      throw Object.assign(new Error(message ?? 'Não foi possível concluir. Tente novamente em instantes.'), { status: response.status, code: data.error, stage: data.stage });
     }
     return data;
   } catch (error) {
@@ -127,9 +130,54 @@ function navigate() {
   $('#page-label').textContent = pages[currentPage]; document.title = `${pages[currentPage]} · Luna Studio`;
   if (currentPage !== 'connection') resetQr();
   if (authenticated) { void refresh(); if (currentPage === 'teachings') void loadTeachings().catch(error => toast(error.message, true)); }
+  if (authenticated && currentPage === 'settings') void loadStages();
   window.scrollTo({ top: 0 });
 }
 function node(tag, className, text) { const element = document.createElement(tag); if (className) element.className = className; if (text !== undefined) element.textContent = text; return element; }
+function stageEditor(stage) {
+  const section = node('details', 'stage-editor');
+  const heading = node('summary', '', stage.label);
+  const form = node('form');
+  const label = node('label', '', 'Orientação para o agente');
+  const field = node('textarea');
+  field.id = 'stage-' + stage.id; label.htmlFor = field.id;
+  field.required = true; field.maxLength = 700; field.rows = 4; field.value = stage.content;
+  const save = node('button', 'button primary', 'Salvar etapa');
+  const feedback = node('p', 'stage-feedback'); feedback.setAttribute('role', 'status');
+  form.append(label, field, feedback, save); section.append(heading, form);
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!field.value.trim()) { feedback.textContent = 'Escreva uma orientação antes de salvar.'; return; }
+    save.disabled = true; field.readOnly = true;
+    try {
+      const saved = await api('panel/stages/' + stage.id, { method: 'PUT', body: JSON.stringify({ content: field.value.trim(), revision: stage.revision }) });
+      stage.revision = saved.revision; field.value = saved.content; feedback.textContent = 'Salvo. Vale nas próximas conversas e nas que já estão em andamento.';
+      save.textContent = 'Salvar etapa';
+    } catch (error) {
+      if (error.code === 'etapa_alterada' && error.stage) {
+        stage.revision = error.stage.revision;
+        feedback.textContent = 'Outra sessão salvou esta orientação: “' + error.stage.content + '”. Confira seu texto antes de substituir.';
+        save.textContent = 'Salvar minha versão';
+      } else feedback.textContent = error.message;
+    } finally { save.disabled = false; field.readOnly = false; }
+  });
+  return section;
+}
+async function loadStages() {
+  if (stagesLoaded || stagesRequest === sessionEpoch) return;
+  const epoch = sessionEpoch; stagesRequest = epoch;
+  $('#stage-retry').hidden = true; $('#stage-status').textContent = 'Carregando orientações…';
+  try {
+    const { stages } = await api('panel/stages');
+    if (epoch !== sessionEpoch) return;
+    $('#stage-list').replaceChildren(...stages.map(stageEditor)); stagesLoaded = true;
+    $('#stage-status').textContent = '';
+  } catch (error) {
+    if (epoch !== sessionEpoch) return;
+    $('#stage-status').textContent = error.message; $('#stage-retry').hidden = false;
+  } finally { if (epoch === sessionEpoch) stagesRequest = null; }
+}
+$('#stage-retry').addEventListener('click', loadStages);
 function formatPhone(value) { return value.replace(/^(\d{2})(\d{4,5})(\d{4})$/, '($1) $2-$3'); }
 function renderContacts() {
   const query = $('#contact-search').value.trim().toLocaleLowerCase('pt-BR'); const digits = query.replace(/\D/g, ''); const filter = $('#contact-filter').value;
@@ -305,7 +353,7 @@ $('#add-lesson').addEventListener('click', () => openLesson()); $('[data-new-les
 $('#lesson-content').addEventListener('input', updateCounter); $('#lesson-search').addEventListener('input', renderTeachings); $('#lesson-filter').addEventListener('change', renderTeachings);
 $$('[data-close-dialog]').forEach(button => button.addEventListener('click', () => $('#lesson-dialog').close()));
 const templates = {
-  tone: { title: 'Nosso jeito de conversar', category: 'atendimento', content: 'Fale de forma próxima e natural, com mensagens curtas. Use “meu irmão” de vez em quando e finalize com 💈. Evite repetir saudações em cada resposta.' },
+  tone: { title: 'Nosso jeito de conversar', category: 'atendimento', content: 'Use frases curtas e cordiais. Responda à pergunta com as palavras que fazem sentido naquele momento. Reserve a saudação para o início e deixe espaço para o cliente responder.' },
   place: { title: 'Como chegar à barbearia', category: 'informacoes', content: '' },
   care: { title: 'Quando o cliente estiver em dúvida', category: 'regras', content: 'Acolha a dúvida com simpatia. Explique as opções disponíveis no catálogo e faça uma pergunta por vez, sem pressionar o cliente a decidir.' },
 };

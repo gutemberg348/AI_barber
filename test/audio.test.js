@@ -67,6 +67,23 @@ test('limites declarados, desativação e formato inválido impedem download e c
   }
 });
 
+test('dicas de áudio usam só termos do catálogo e a etapa da conversa, sem sugerir opções ao ouvir a data', async () => {
+  const requests = [];
+  const service = new AudioTranscriber({ config: config(), client: { audio: { transcriptions: { async create(args) {
+    requests.push(args); return { text: requests.length === 1 ? 'Eduardo.' : '[inaudível]' };
+  } } } } });
+  const history = { catalog: { barbeiros: [{ nome: 'Eduardo' }, { nome: '<inválido>' }] },
+    messages: [{ role: 'user', content: 'texto particular' }, { role: 'assistant', content: 'Com quem você prefere?' }] };
+  const audio = (await voice()).audio;
+  assert.equal(await service.transcribe(audio, download, history), 'Eduardo.');
+  assert.deepEqual(requests[0].keywords, ['Eduardo']);
+  assert.doesNotMatch(requests[0].prompt, /texto particular/);
+  history.messages.push({ role: 'assistant', content: 'Para qual dia?' });
+  await assert.rejects(service.transcribe(audio, download, history), { code: 'audio_empty' });
+  assert.equal(requests[1].keywords, undefined);
+  assert.match(requests[1].prompt, /dia desejado/);
+});
+
 test('limite real de bytes interrompe stream mesmo com tamanho declarado menor; silêncio não vira pedido', async () => {
   let calls = 0;
   const service = new AudioTranscriber({ config: config({ WHATSAPP_AUDIO_MAX_BYTES: 1024 }), client: { audio: { transcriptions: { async create() { calls++; return { text: '   ' }; } } } } });

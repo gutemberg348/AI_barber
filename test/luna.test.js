@@ -4,6 +4,66 @@ import { Luna, lunaTools } from '../src/luna.js';
 import { BookingService, localTime } from '../src/booking.js';
 import { config, memoryStore, fakeApi, phone, bookingArgs, catalog } from './helpers.js';
 
+test('respostas faladas sobre o dia avançam para uma consulta sem repetir as opções', async t => {
+  const store = memoryStore(); t.after(() => store.close());
+  const c = config(); const queries = [];
+  const luna = new Luna({ config: c, store, client: { responses: { create: assert.fail } }, booking: {
+    command: async () => null, async tool(name, query) {
+      assert.equal(name, 'grade_horarios'); queries.push(query); return { directReply: 'Grade atual', scheduleQuery: query };
+    },
+  } });
+  const today = new Date(localTime(c.BARBEARIA_TIMEZONE).slice(0, 10) + 'T12:00:00Z');
+  today.setUTCDate(today.getUTCDate() + 1);
+  const weekday = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', timeZone: 'UTC' }).format(today);
+  const selection = { barbeiro_id: 3, servicos: [7, 8], data: null, comparar_barbeiros: false };
+  luna.remember(phone, 'Com o Julio', 'Para qual dia? 📅', { scheduleSelection: selection });
+  for (const [text, data] of [[`Pode ser na ${weekday}, por favor.`, today.toISOString().slice(0, 10)], ['O primeiro que tiver.', null]]) {
+    assert.equal(await luna.reply(text, phone, { voiceInput: true }), 'Grade atual');
+    assert.deepEqual(queries.at(-1), { ...selection, data });
+  }
+});
+
+test('resposta ambígua a uma pergunta de dia recebe esclarecimento e não dispara reserva', async t => {
+  const store = memoryStore(); t.after(() => store.close());
+  const c = config(); const api = fakeApi();
+  const luna = new Luna({ config: c, store, booking: new BookingService({ config: c, api, store }),
+    client: { responses: { async create() { return { output: [], output_text: 'Para qual dia? 📅' }; } } } });
+  luna.remember(phone, 'Corte com Julio', 'Para qual dia? 📅');
+  assert.match(await luna.reply('De manhã.', phone, { voiceInput: true }), /Entendi, de manhã/);
+  assert.equal(api.calls.length, 0);
+});
+
+test('após listar os profissionais, escolha por voz avança para os serviços desse barbeiro', async t => {
+  const store = memoryStore(); t.after(() => store.close());
+  const c = config(); const api = fakeApi(); let calls = 0;
+  const luna = new Luna({ config: c, store, booking: new BookingService({ config: c, api, store }),
+    client: { responses: { async create() {
+      calls++;
+      const next = calls === 3;
+      return { output: [{ type: 'function_call', id: 'fc' + calls, call_id: 'call' + calls,
+        name: next ? 'listar_servicos' : 'listar_barbeiros', arguments: next ? '{"barbeiro_id":1}' : '{}' }] };
+    } } } });
+  const metadata = {};
+  const list = await luna.reply('Quais barbeiros tem?', phone, metadata);
+  assert.match(list, /Julio 💈/); assert.doesNotMatch(list, /prefere/);
+  luna.remember(phone, 'Quais barbeiros tem?', list, metadata);
+  const next = await luna.reply('Com o Julio.', phone, { voiceInput: true });
+  assert.match(next, /Serviços com Julio/); assert.doesNotMatch(next, /Temos estes barbeiros/);
+  assert.equal(calls, 3);
+});
+
+test('dia falado por extenso permite consulta e conserva a data escolhida', async t => {
+  const store = memoryStore(); t.after(() => store.close());
+  const query = { barbeiro_id: 1, servicos: [2], data: '2099-11-22' };
+  const luna = new Luna({ config: config(), store, booking: { command: async () => null, async tool(name, args) {
+    assert.equal(name, 'grade_horarios'); assert.deepEqual(args, query);
+    return { directReply: 'Grade do site', scheduleQuery: query };
+  } }, client: { responses: { async create() { return { output: [{ type: 'function_call', id: 'fc1', call_id: 'call1',
+    name: 'grade_horarios', arguments: JSON.stringify(query) }] }; } } } });
+  luna.remember(phone, 'Corte com Julio', 'Para qual dia?');
+  assert.equal(await luna.reply('Dia vinte e dois de novembro de dois mil e noventa e nove.', phone, { voiceInput: true }), 'Grade do site');
+});
+
 test('Responses API consulta ferramenta e devolve seu resultado na próxima chamada sem tokens', async t => {
   const store = memoryStore(); t.after(() => store.close());
   const api = fakeApi(); const c = config();

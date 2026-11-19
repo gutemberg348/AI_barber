@@ -109,6 +109,29 @@ test('Luna incorpora alterações dos ensinamentos nas próximas respostas sem r
   assert.ok(!instructions[0].includes(lesson.content)); assert.ok(instructions[1].includes(lesson.content)); assert.ok(!instructions[2].includes(lesson.content));
   assert.match(instructions[1], /não autorizam pular a confirmação/);
 });
+
+test('etapas têm orientações iniciais independentes e edição concorrente preserva o texto já salvo', async t => {
+  const { app, headers, store, c } = await setup(t);
+  const url = '/api/v1/panel/stages';
+  assert.equal((await app.inject(url)).statusCode, 401);
+  const read = () => app.inject({ url, headers }).then(result => result.json().stages);
+  const before = await read();
+  assert.equal(before.length, 6);
+  assert.ok(before.every(stage => stage.content && stage.revision === 0));
+  const update = (id, content) => app.inject({ method: 'PUT', url: url + '/' + id, headers, payload: { revision: 0, content } });
+  assert.equal((await update('saudacao', '   ')).statusCode, 400);
+  const content = 'Cumprimente com uma frase sobre boas-vindas à equipe.';
+  assert.equal((await update('saudacao', content)).json().revision, 1);
+  assert.equal((await update('saudacao', 'Outro texto')).statusCode, 409);
+  assert.deepEqual((await read()).slice(1), before.slice(1));
+  const luna = new Luna({ store, config: c, booking: new BookingService({ store, config: c, api: fakeApi() }),
+    client: { responses: { async create(request) {
+      assert.ok(request.instructions.includes(content));
+      assert.ok(!request.instructions.includes(before[0].content));
+      return { output: [], output_text: 'Bom dia!' };
+    } } } });
+  assert.equal(await luna.reply('Oi', phone), 'Bom dia!');
+});
 test('pausa durante resposta em processamento impede envio e preserva resposta para retomada', async t => {
   const store = memoryStore(); t.after(() => store.close()); const sent = [];
   const luna = { async reply() { store.set('system', 'bot-enabled', false); return 'Resposta pronta'; }, remember() {} };

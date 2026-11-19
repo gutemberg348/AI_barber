@@ -55,3 +55,9 @@ Somente login e assets são públicos. Dados, QR e controles exigem sessão ou B
 ## Prévia isolada para desenvolvimento
 
 `node scripts/preview-panel.js` abre **http://127.0.0.1:3467/painel** com banco em memória, sem clientes, IA ou WhatsApp reais. Login: `admin@admin` / `admin`. O QR dela é ilustrativo e não conecta ao WhatsApp. Não publique essa prévia. Use `npm start` para o painel real.
+
+## Orientações por etapa
+
+Em **Configurações → Atendimento por etapa**, abra Saudação, Serviços e profissionais, Dia e horário, Entendimento de áudio, Resumo e confirmação ou Dúvidas e retomada. Cada etapa já tem uma orientação inicial. Edite o texto e toque em **Salvar etapa** para aplicá-lo às próximas respostas, inclusive em conversas em andamento. Outra pessoa pode editar uma etapa diferente ao mesmo tempo.
+
+A aba **Ensinamentos** continua disponível para informações próprias da barbearia, como referências para chegar. O site fornece os preços e vagas. O servidor monta a grade, o resumo da reserva e a solicitação de aceite.

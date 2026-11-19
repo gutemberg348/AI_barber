@@ -3,6 +3,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { pauseSettings } from './bot-control.js';
 import { saveContact, listedContacts } from './contacts.js';
+import { stageGuide } from './stages.js';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 const lessonSchema = z.object({
@@ -88,6 +89,17 @@ export async function registerPanel(app, { config, store, fullStatus, sessions }
     };
   });
   app.get('/api/v1/panel/teachings', async () => knowledge(store));
+  app.get('/api/v1/panel/stages', async () => ({ stages: stageGuide(store) }));
+  app.put('/api/v1/panel/stages/:id', async (request, reply) => {
+    const stage = stageGuide(store).find(item => item.id === request.params.id);
+    if (!stage) return reply.code(404).send({ error: 'etapa_desconhecida' });
+    const parsed = z.object({ revision: z.number().int().nonnegative(), content: z.string().trim().min(1).max(700) }).strict().safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'etapa_invalida' });
+    if (parsed.data.revision !== stage.revision) return reply.code(409).send({ error: 'etapa_alterada', stage });
+    const next = { ...stage, content: parsed.data.content, revision: stage.revision + 1 };
+    store.set('stage-guide', stage.id, { content: next.content, revision: next.revision });
+    return next;
+  });
   app.get('/api/v1/panel/contacts', async () => ({ contacts: listedContacts(store) }));
   app.put('/api/v1/panel/contacts/:phone', async (request, reply) => {
     const parsed = z.object({ enabled: z.boolean(), name: z.string().trim().max(80).optional() }).strict().safeParse(request.body);

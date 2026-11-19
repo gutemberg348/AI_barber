@@ -156,7 +156,10 @@ export class MessageProcessor {
       if (item.audio && item.phone && !item.unsupported && Date.now() - item.createdAt <= 3600000) {
         try {
           if (!this.transcriber) throw new Error('audio_unavailable');
-          item.text = await this.transcriber.transcribe(item.audio, this.downloadAudio);
+          const history = this.store.get('history', item.phone);
+          const recent = history && Date.now() - history.updatedAt < this.config.HISTORY_TTL_HOURS * 3600000;
+          item.text = await this.transcriber.transcribe(item.audio, this.downloadAudio, recent ? history : null);
+          item.voiceInput = true;
         } catch (error) {
           item.audioReply = audioFailureReply(error, this.config);
           // Não registrar exceções do SDK, mídia, telefone ou transcrição.
@@ -193,7 +196,7 @@ export class MessageProcessor {
           item.reply = 'Pode resumir seu pedido em até 4.000 caracteres?';
         } else {
           try {
-            const metadata = { receivedAt: item.createdAt };
+            const metadata = { receivedAt: item.createdAt, voiceInput: item.voiceInput === true };
             item.reply = await this.luna.reply(item.text, item.phone, metadata);
             if (metadata.scheduleQuery) item.scheduleQuery = metadata.scheduleQuery;
             if (metadata.scheduleNotice) item.scheduleNotice = metadata.scheduleNotice;
@@ -213,6 +216,7 @@ export class MessageProcessor {
       this.store.transaction(() => {
         this.store.set('inbound', item.id, item);
         if (item.phone) this.luna.remember(item.phone, item.text.slice(0, 4000), item.reply, {
+          preserveSelection: Boolean(item.audioReply),
           catalog: item.catalog, scheduleQuery: item.scheduleQuery, scheduleSelection: item.scheduleSelection,
         });
       });

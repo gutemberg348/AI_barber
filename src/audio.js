@@ -7,6 +7,20 @@ const formats = new Map([
 ]);
 const failure = code => Object.assign(new Error(code), { code });
 
+function recognitionContext(config, history) {
+  const question = history?.messages?.at(-1)?.content ?? '';
+  const barbers = history?.catalog?.barbeiros ?? [];
+  const askingDay = /(?:qual|que) (?:o )?(?:dia|data)|dia (?:você |voce )?prefere/i.test(question);
+  const askingBarber = /com quem|qual (?:barbeiro|profissional)/i.test(question);
+  const prompt = 'Conversa em português do Brasil com uma barbearia. Transcreva apenas o que conseguir ouvir, inclusive negativas e correções.'
+    + (askingDay ? ' A pergunta anterior era sobre o dia desejado.' : askingBarber ? ' A pergunta anterior era sobre a escolha de profissional.' : '');
+  const names = barbers.map(item => item.nome);
+  const services = barbers.flatMap(item => (item.servicos ?? []).map(service => service.nome));
+  const words = askingDay ? [] : askingBarber ? names : [...names, ...services, config.BARBEARIA_NOME, config.BARBEARIA_DONO];
+  const keywords = [...new Set(words.filter(word => typeof word === 'string' && /^[\p{L}\p{M}][\p{L}\p{M} '’-]{0,47}$/u.test(word)))].slice(0, 24);
+  return { prompt, keywords };
+}
+
 export function audioFailureReply(error, config) {
   if (error.code === 'audio_disabled') return 'O atendimento por áudio está desativado. Pode escrever seu pedido? 💈';
   if (error.code === 'audio_too_long') return `Envie um áudio de até ${config.WHATSAPP_AUDIO_MAX_SECONDS} segundos ou escreva seu pedido. 💈`;
@@ -22,7 +36,7 @@ export class AudioTranscriber {
     this.config = config;
     this.client = client ?? (config.OPENAI_API_KEY ? new OpenAI({ apiKey: config.OPENAI_API_KEY, timeout: 45000, maxRetries: 1 }) : null);
   }
-  async transcribe(audio, download) {
+  async transcribe(audio, download, history) {
     const c = this.config;
     if (!c.WHATSAPP_AUDIO_ENABLED) throw failure('audio_disabled');
     if (!this.client || !download) throw failure('audio_unavailable');
@@ -64,14 +78,18 @@ export class AudioTranscriber {
       controller.abort();
       stream?.destroy();
     }
+    const { prompt, keywords } = recognitionContext(c, history);
+    const contextual = c.OPENAI_TRANSCRIPTION_MODEL === 'gpt-transcribe';
     const result = await this.client.audio.transcriptions.create({
       file: await toFile(buffer, `mensagem.${extension}`, { type: mime }),
       model: c.OPENAI_TRANSCRIPTION_MODEL,
-      ...(c.OPENAI_TRANSCRIPTION_MODEL === 'gpt-transcribe' ? { languages: ['pt'] } : { language: 'pt' }),
+      ...(contextual ? { languages: ['pt'], ...(keywords.length ? { keywords } : {}) } : { language: 'pt' }),
+      ...(!c.OPENAI_TRANSCRIPTION_MODEL.includes('diarize') ? { prompt } : {}),
       response_format: 'json',
     });
     const text = typeof result?.text === 'string' ? result.text.trim() : '';
-    if (!text) throw failure('audio_empty');
+    const label = text.replace(/[^\p{L}\p{N} ]/gu, '').trim().toLowerCase();
+    if (!label || ['inaudível', 'ininteligível', 'silêncio', 'ruído', 'inaudible'].includes(label)) throw failure('audio_empty');
     if (text.length > 4000) throw failure('audio_text_too_long');
     return text;
   }

@@ -74,14 +74,15 @@ export function haircutListReply(catalog, barberId = null) {
   return [...groups.values()].map(group => `${group.name}:\n\n${group.options.join('\n')}`).join('\n\n') + '\n\n👊💈';
 }
 
-export function barberListReply(catalog) {
+export function barberListReply(catalog, askChoice = true) {
   const barbers = catalog.barbeiros ?? [];
   if (!barbers.length) return 'Não encontrei barbeiros cadastrados nessa consulta. Tente novamente em instantes. 💈';
-  return `Temos estes barbeiros:\n\n${barbers.map(barber => `${clean(barber.nome)} 💈`).join('\n')}\n\nCom quem você prefere? 💈`;
+  const list = barbers.map(barber => `${clean(barber.nome)} 💈`).join('\n');
+  return `Temos estes barbeiros:\n\n${list}` + (askChoice ? '\n\nCom quem você prefere? 💈' : '');
 }
 
 // A lista geral usa todos os serviços retornados pelo site, sem classificação por nome.
-export function serviceListReply(catalog, barberId = null) {
+export function serviceListReply(catalog, barberId = null, askChoice = true) {
   const blocks = [];
   for (const barber of catalog.barbeiros ?? []) {
     if (barberId !== null && barber.id !== barberId) continue;
@@ -89,6 +90,6 @@ export function serviceListReply(catalog, barberId = null) {
     if (!services.length) continue;
     blocks.push(`Serviços com ${clean(barber.nome)} 💈\n\n${services.map(service => `${clean(service.nome)} — ${money(service.preco)}`).join('\n')}`);
   }
-  return blocks.length ? `${blocks.join('\n\n')}\n\nQual você quer marcar? 👊💈`
+  return blocks.length ? blocks.join('\n\n') + (askChoice ? '\n\nQual você quer marcar? 👊💈' : '')
     : 'Não encontrei serviços cadastrados nessa consulta. Quer conferir outro profissional? 💈';
 }

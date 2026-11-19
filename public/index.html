@@ -107,6 +107,13 @@
     </section>
 
     <section data-page="settings" hidden><div class="page-heading"><div><span class="eyebrow muted">TUDO NO SEU LUGAR</span><h1>Configurações<span class="accent">.</span></h1><p>Acompanhe sua operação e escolha quando a Luna atende.</p></div></div>
+      <article class="card stage-guide" aria-labelledby="stage-title">
+        <div class="card-heading"><h2 id="stage-title">Atendimento por etapa</h2><svg><use href="#i-book"/></svg></div>
+        <p class="card-description">Abra uma etapa para ajustar como o agente conversa. Cada orientação já vem preenchida e pode ser salva separadamente.</p>
+        <div id="stage-list"></div>
+        <p id="stage-status" role="status">Carregando orientações…</p>
+        <button id="stage-retry" class="button secondary" type="button" hidden>Tentar novamente</button>
+      </article>
       <div class="settings-grid"><article class="card"><div class="card-heading"><h2>Atendimento automático</h2><svg><use href="#i-bolt"/></svg></div><div class="setting-toggle"><div><strong>Luna ativada</strong><p>Permitir respostas automáticas no WhatsApp.</p></div><button id="bot-switch" class="switch" role="switch" aria-checked="false" aria-label="Ativar atendimento da Luna" data-toggle-bot disabled><span></span></button></div><div class="soft-note">Ao pausar, a Luna deixa de enviar respostas. Uma operação já enviada ao site pode terminar; as reservas existentes são preservadas.</div></article>
       <article class="card"><div class="card-heading"><h2>Seu espaço</h2><span class="mini-label">BARBEARIA</span></div><dl class="detail-list"><div><dt>Nome</dt><dd data-shop>—</dd></div><div><dt>Responsável</dt><dd id="setting-owner">—</dd></div><div><dt>Fuso horário</dt><dd id="setting-timezone">—</dd></div><div><dt>Modelo da Luna</dt><dd id="setting-model">—</dd></div></dl></article>
       <article class="card"><div class="card-heading"><h2>Integração com o site</h2><svg><use href="#i-clock"/></svg></div><p class="card-description">Confira se a Luna consegue consultar o catálogo da barbearia.</p><div id="integration-result" class="soft-note" role="status">A conexão ainda não foi verificada nesta sessão.</div><button class="button secondary full" id="check-integration"><svg><use href="#i-refresh"/></svg>Verificar integração</button><a id="site-link" class="text-link site-link" target="_blank" rel="noopener noreferrer">Abrir site da barbearia ↗</a></article>

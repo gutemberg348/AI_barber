@@ -5,6 +5,7 @@ import { toResponseInputItems } from 'openai/lib/responses/ResponseInputItems';
 import { schemas, localTime, apiFailure } from './booking.js';
 import { ApiError } from './barbershop.js';
 import { knowledgeInstructions } from './panel.js';
+import { stageInstructions } from './stages.js';
 
 const descriptions = {
   listar_barbeiros: 'Consultar o site e ENVIAR todos os barbeiros reais, um por linha com 💈 no final, e perguntar com quem prefere. Use para "quais barbeiros tem?" e quando o cliente quer marcar/ver horários, mas não informou profissional. Não pergunte barbeiro e serviço juntos. Depois da escolha, se não houver serviço definido, use listar_servicos para mostrar todas as opções desse barbeiro. Não afirma disponibilidade nem escolhe pelo cliente.',
@@ -33,11 +34,18 @@ export const lunaTools = Object.entries(schemas).filter(([name]) => name !== 'di
 // "hoje" pela data de uma grade antiga. Frases mais complexas seguem o contexto.
 function shortReplyDate(text, currentTime) {
   const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-    .trim().replace(/[.!?]+$/, '').trim().replace(/^(?:pra|para)\s+/, '');
+    .trim().replace(/[,\s]*(?:por favor)?[.!?]*$/, '').trim()
+    .replace(/^(?:pode ser |eu prefiro |prefiro )/, '').replace(/^(?:pra|para|na|no)\s+/, '');
   const offsets = { hoje: 0, hj: 0, amanha: 1, 'depois de amanha': 2 };
-  if (!Object.hasOwn(offsets, normalized)) return null;
   const day = new Date(`${currentTime.slice(0, 10)}T12:00:00Z`);
-  day.setUTCDate(day.getUTCDate() + offsets[normalized]);
+  const weekdays = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+  let offset = offsets[normalized];
+  if (!Object.hasOwn(offsets, normalized)) {
+    const weekday = weekdays.indexOf(normalized.replace(/[- ]feira$/, ''));
+    if (weekday < 0 || weekday === day.getUTCDay()) return null;
+    offset = (weekday - day.getUTCDay() + 7) % 7;
+  }
+  day.setUTCDate(day.getUTCDate() + offset);
   return day.toISOString().slice(0, 10);
 }
 
@@ -51,6 +59,21 @@ const normalize = text => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').
 const asksForMissingDetail = text => /^(?:(?:com|para|pra|em) )?qual (?:e )?(?:o |a )?(?:seu |sua )?(?:nome|servico|profissional|barbeiro|dia|data)\b[^.!?\n]*\?[^\p{L}\p{N}]*$/u.test(normalize(text).trim());
 const hasDayReference = text => /\b(?:hoje|hj|amanha|segunda|terca|quarta|quinta|sexta|sabado|domingo|semana|dia\s+\d{1,2})\b|\b\d{1,4}[/-]\d{1,2}\b|^\s*(?:0?[1-9]|[12]\d|3[01])\s*[.!?]?\s*$|\b\d{1,2}\s+de\s+(?:janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\b/.test(normalize(text));
 const asksForSuggestions = text => /\b(?:horarios?|vagas?|disponibilidade|disponivel|proxim[oa]|quando|sugest[aoe]+s?)\b/.test(normalize(text));
+const spokenDay = '(?:primeiro|um|dois|tres|quatro|cinco|seis|sete|oito|nove|dez|onze|doze|treze|quatorze|catorze|quinze|dezesseis|dezessete|dezoito|dezenove|vinte(?: e (?:um|dois|tres|quatro|cinco|seis|sete|oito|nove))?|trinta(?: e um)?)';
+const spokenDate = new RegExp(`\\b(?:dia ${spokenDay}\\b|${spokenDay} de (?:janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\\b)`);
+const hasSpokenDate = text => spokenDate.test(normalize(text));
+const justBrowsing = text => /\b(?:quais|quem|quanto|precos?|valores?|catalogo)\b/.test(normalize(text))
+  && !/\b(?:horarios?|vagas?|disponibilidade|marcar|agendar|reservar|quero fazer|quero cortar)\b/.test(normalize(text));
+const flexibleDay = text => /^(?:pode ser )?(?:qualquer dia|tanto faz|(?:o )?primeiro (?:que (?:tiver|der)|dia livre)|quando (?:tiver|der)|sem preferencia)(?:[, ]+por favor)?[.!?]*$/u.test(normalize(text).trim());
+const asksDay = text => /(?:qual|que) (?:o )?(?:dia|data)|(?:dia|data) (?:voce )?prefere|escrever a data/i.test(normalize(text)) && text.includes('?');
+function clarifyDay(text, previous) {
+  if (/^(?:prefiro |pode ser )?(?:de|pela) manha[.!]?$/u.test(normalize(text).trim())) return 'Entendi, de manhã. Em qual data você gostaria de vir?';
+  if (/primeiro dia livre/i.test(previous)) return 'Pode me dizer a data por escrito, com dia e mês?';
+  return 'Pode escrever a data ou prefere que eu procure o primeiro dia livre?';
+}
+function menuBody(reply) {
+  return reply.replace(/^Claro\.\n\n/, '').replace(/\n\n(?:Com quem você prefere|Qual você quer marcar)\?[^\n]*$/, '');
+}
 const asksForAllServices = text => /\b(?:servicos?|procedimentos?|catalogo|cardapio)\b/.test(normalize(text))
   && !/\b(?:servicos? (?:de|para) corte|somente cortes?|so cortes?)\b/.test(normalize(text));
 const asksToVisit = text => /\b(?:(?:posso|podemos|da (?:pra|para)|tem como) (?:ir|chegar|comparecer)|(?:posso|podemos) passar (?:ai|la|na barbearia)|(?:to|tou|estou|tamo|estamos) (?:indo|chegando)|(?:quero|vou) ir (?:ai|la|na barbearia)|vou (?:ai|na barbearia))\b/.test(normalize(text));
@@ -109,6 +132,9 @@ export class Luna {
     ];
     const explicitDate = shortReplyDate(text, currentTime);
     const previousSelection = history?.scheduleQuery ?? history?.scheduleSelection;
+    const previousReply = history?.messages?.at(-1)?.content ?? '';
+    const waitingForDay = asksDay(previousReply) || Boolean(history?.scheduleSelection && !history.scheduleSelection.data);
+    const nextAvailable = waitingForDay && flexibleDay(text);
     const explicitTime = chosenTime(text) ?? (explicitDate ? previousSelection?.hora : null);
     // Um pedido já com data, hora e serviço pode chegar sem consulta anterior.
     // Entregar os IDs reais antes da primeira decisão evita inventá-los no preparo.
@@ -118,7 +144,7 @@ export class Luna {
     }
     // Ao mudar só o dia após uma grade, os serviços/profissional já são conhecidos.
     // Reconsultar diretamente evita que o modelo esqueça IDs ou copie as vagas antigas.
-    if (explicitDate && previousSelection && !previousSelection.hora) {
+    if ((explicitDate || nextAvailable) && previousSelection && !previousSelection.hora) {
       const result = await this.booking.tool('grade_horarios', { ...previousSelection, data: explicitDate }, phone);
       metadata.scheduleQuery = result.scheduleQuery;
       return result.directReply;
@@ -133,7 +159,9 @@ export class Luna {
       : pending?.state === 'executing'
         ? 'Existe uma operação anterior com resultado incerto. Responda normalmente às perguntas de serviços, preços e horários usando as ferramentas de consulta. Não repita um aviso de confirmação em cada resposta. Uma nova reserva ou cancelamento fica bloqueado até recuperar o pedido anterior: quando for esse o pedido, oriente responder CONFIRMAR, sem código. Nunca afirme que já marcou.' : '';
     const instructions = `${this.prompt}\nBarbearia: ${this.config.BARBEARIA_NOME}. Dono: ${this.config.BARBEARIA_DONO}. Site: ${this.config.BARBEARIA_SITE_URL}.\nData/hora atual: ${currentTime}. Fuso: ${this.config.BARBEARIA_TIMEZONE}.\n${explicitDate ? `A mensagem atual indica o dia ${explicitDate}. Use essa data na consulta; não a substitua pela data de uma grade anterior.` : ''}\n${pendingContext}${catalogContext}${selectionContext}`;
-    const teachings = knowledgeInstructions(this.store);
+    const teachings = stageInstructions(this.store) + knowledgeInstructions(this.store)
+      + (metadata.voiceInput ? '\nA última mensagem é uma transcrição. Interprete-a junto à última pergunta. Se não fizer sentido, esclareça só a palavra ou escolha incerta.' : '');
+    let correctedRepeat = false;
     let correction = visitQuestion ? `O cliente quer conferir uma reserva/visita. Execute ${visitTool} com o dia e hora mencionados antes de responder. Não prepare reserva nem mostre vagas nesta consulta.` : '';
     let availabilityAttempted = false;
     let appointmentsRead = false;
@@ -154,6 +182,14 @@ export class Luna {
           correction = 'A resposta anterior foi descartada: falou de horários ou disponibilidade sem resultado que a sustente. Não copie ou renomeie datas da grade do histórico, nem diga que uma consulta falhou sem tê-la executado. Para mostrar vagas, execute grade_horarios agora com o dia pedido (ou null se pediu sugestões sem dia). Se faltam serviço ou profissional, pergunte apenas o dado que falta. Se já escolheu horário, peça só o nome caso falte ou use preparar_agendamento, que revalida. Não repita a hora em texto livre.';
           continue;
         }
+        if (waitingForDay && asksDay(reply) && !hasDayReference(reply) && !hasSpokenDate(reply)) {
+          if (!correctedRepeat && (hasDayReference(text) || hasSpokenDate(text) || nextAvailable)) {
+            correctedRepeat = true;
+            correction = 'O cliente já respondeu sobre o dia. Use a data indicada ou busque o próximo dia livre se ele deixou a escolha aberta. Se houver duas interpretações, pergunte qual delas quis dizer.';
+            continue;
+          }
+          return clarifyDay(text, previousReply);
+        }
         return reply.slice(0, 6000);
       }
       // Os itens de raciocínio também precisam acompanhar as saídas das ferramentas.
@@ -167,19 +203,20 @@ export class Luna {
           // Uma pergunta geral de serviços não pode cair no filtro exclusivo de cortes.
           if (toolName === 'listar_cortes' && asksForAllServices(text)) toolName = 'listar_servicos';
           if (['grade_horarios', 'conferir_horario', 'preparar_agendamento'].includes(toolName)
-            && !input.some(item => typeof item.content === 'string' && hasDayReference(item.content))) {
+            && !input.some(item => typeof item.content === 'string' && (hasDayReference(item.content) || hasSpokenDate(item.content)))) {
             const query = schemas.grade_horarios.parse({ barbeiro_id: args.barbeiro_id, servicos: args.servicos, data: args.data, comparar_barbeiros: args.comparar_barbeiros ?? false });
-            if (toolName !== 'grade_horarios' || !input.some(item => item.role === 'user' && asksForSuggestions(item.content))) {
+            if (toolName !== 'grade_horarios' || !(nextAvailable || input.some(item => item.role === 'user' && asksForSuggestions(item.content)))) {
               const catalog = await this.booking.tool('catalogo', {}, phone);
               const barber = catalog.barbeiros?.find(item => item.id === query.barbeiro_id);
               if (!barber || query.servicos.some(id => !barber.servicos?.some(service => service.id === id))) throw new ApiError('dados_invalidos', 422);
               metadata.catalog = catalog;
               metadata.scheduleSelection = { ...query, data: null, ...(explicitTime ? { hora: explicitTime } : {}) };
-              return 'Para qual dia? 📅';
+              return waitingForDay ? clarifyDay(text, previousReply) : 'Qual dia fica melhor para você?';
             }
             // Pedido de sugestões sem data usa a janela, não um dia escolhido pelo modelo.
             args.data = null;
           }
+          if (nextAvailable && toolName === 'grade_horarios') args.data = null;
           if (toolName === 'grade_horarios' && explicitTime && args?.data && !args.comparar_barbeiros) {
             // Não transformar uma escolha já feita em outra pergunta de horário.
             toolName = 'conferir_horario';
@@ -189,7 +226,7 @@ export class Luna {
             result = { sucesso: false, erro: `O cliente pediu ${explicitDate} nesta mensagem. Consulte essa data; não use ${args?.data ?? 'data indefinida'} do histórico. A grade oferece alternativas se esse dia não tiver vagas.` };
           } else {
             if (['grade_horarios', 'conferir_horario', 'preparar_agendamento'].includes(toolName)) availabilityAttempted = true;
-            result = await this.booking.tool(toolName, args, phone);
+            result = await this.booking.tool(toolName, args, phone, { askChoice: !justBrowsing(text) });
             if (toolName === 'agendamentos' && Array.isArray(result.agendamentos)) appointmentsRead = true;
             if (toolName === 'catalogo') metadata.catalog = result;
             if (toolName === 'conferir_horario' && result.disponivel) {
@@ -199,6 +236,16 @@ export class Luna {
           // Confirmação é escrita pelo servidor, sem reinterpretação do modelo.
           if (result.directReply) {
             if (result.catalog) metadata.catalog = result.catalog;
+            if (['listar_barbeiros', 'listar_servicos', 'listar_cortes'].includes(toolName) && menuBody(previousReply) === menuBody(result.directReply)) {
+              if (/\b(?:quais|quem|barbeiros|servicos|cortes|opcoes|lista|todos|todas|repete|repita|novamente|novo|precos|valores)\b/.test(normalize(text))) {
+                return previousReply.startsWith('Claro.\n\n') ? result.directReply : 'Claro.\n\n' + result.directReply;
+              }
+              if (correctedRepeat) return toolName === 'listar_barbeiros' ? 'Pode me dizer o nome do profissional que escolheu?' : 'Qual dessas opções chamou sua atenção?';
+              correctedRepeat = true;
+              correction = 'Esta lista já foi mostrada. Interprete a resposta atual como escolha, correção ou dúvida. Aproveite a escolha e avance. Se ambígua, esclareça o detalhe em uma pergunta curta.';
+              input.push({ type: 'function_call_output', call_id: call.call_id, output: JSON.stringify({ catalogo: result.catalog, lista_ja_exibida: true }) });
+              continue;
+            }
             if (result.scheduleQuery) metadata.scheduleQuery = result.scheduleQuery;
             if (result.scheduleNotice) metadata.scheduleNotice = result.scheduleNotice;
             return result.directReply;
@@ -227,8 +274,8 @@ export class Luna {
     const catalog = metadata.catalog ?? valid?.catalog;
     // Só a grade imediatamente anterior autoriza reaproveitar a escolha numa resposta curta.
     // Outra mensagem pode ter trocado serviço ou barbeiro.
-    const scheduleQuery = metadata.scheduleQuery;
-    const scheduleSelection = metadata.scheduleSelection;
+    const scheduleQuery = metadata.scheduleQuery ?? (metadata.preserveSelection ? valid?.scheduleQuery : undefined);
+    const scheduleSelection = metadata.scheduleSelection ?? (metadata.preserveSelection ? valid?.scheduleSelection : undefined);
     this.store.set('history', phone, {
       messages: messages.slice(-20), updatedAt: Date.now(),
       ...(catalog ? { catalog } : {}), ...(scheduleQuery ? { scheduleQuery } : {}),

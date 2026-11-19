@@ -50,19 +50,19 @@ const money = value => Number(value).toLocaleString('pt-BR', { style: 'currency'
 
 export class BookingService {
   constructor({ store, api, config, logger }) { Object.assign(this, { store, api, config, logger }); }
-  async tool(name, raw, phone) {
+  async tool(name, raw, phone, { askChoice = true } = {}) {
     if (!Object.hasOwn(schemas, name)) throw new ApiError('ferramenta_invalida');
     const args = schemas[name].parse(raw);
     if (name === 'catalogo') return enrichCatalog(await this.api.request('catalogo'));
     if (name === 'listar_barbeiros') {
       const catalog = await this.api.request('catalogo');
-      return { directReply: barberListReply(catalog), catalog: enrichCatalog(catalog) };
+      return { directReply: barberListReply(catalog, askChoice), catalog: enrichCatalog(catalog) };
     }
     if (['listar_cortes', 'listar_servicos'].includes(name)) {
       const catalog = await this.api.request('catalogo');
       if (args.barbeiro_id !== null && !catalog.barbeiros?.some(barber => barber.id === args.barbeiro_id)) throw new ApiError('dados_invalidos', 422);
       const format = name === 'listar_servicos' ? serviceListReply : haircutListReply;
-      return { directReply: format(catalog, args.barbeiro_id), catalog: enrichCatalog(catalog) };
+      return { directReply: format(catalog, args.barbeiro_id, askChoice), catalog: enrichCatalog(catalog) };
     }
     if (name === 'disponibilidade') return this.api.request('disponibilidade', args);
     if (name === 'grade_horarios') return scheduleReply(this.api, args);

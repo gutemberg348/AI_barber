@@ -142,3 +142,12 @@
   .contact-control>span { font-size: 10px; }
   .contacts-main .teaching-toolbar select { width: 130px; }
 }
+.stage-guide { margin-bottom: 20px; }
+.stage-editor { border-top: 1px solid var(--line); }
+.stage-editor summary { padding: 15px 4px; cursor: pointer; color: var(--green); font-weight: 600; }
+.stage-editor summary:focus-visible { outline: 2px solid var(--green); }
+.stage-editor form { max-width: 48rem; padding: 0 4px 18px; }
+.stage-editor label { margin-top: 4px; }
+.stage-editor textarea { font-size: 16px; }
+.stage-feedback { margin: 8px 0; overflow-wrap: anywhere; }
+#stage-status:empty { display: none; }

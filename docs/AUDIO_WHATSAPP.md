@@ -24,6 +24,8 @@ Para desligar apenas a interpretação de áudio, defina `WHATSAPP_AUDIO_ENABLED
 
 A transcrição pode errar nomes, números ou falas com ruído. O cliente confere profissional, serviços, valor, data e horário no resumo antes de aceitar. Falas ambíguas devem ser esclarecidas.
 
+O modelo padrão recebe dicas curtas de contexto em português. Na escolha do profissional, podem acompanhar a gravação nomes públicos do catálogo consultado naquela conversa. Na pergunta pelo dia, a dica descreve a etapa sem sugerir uma data. Mensagens anteriores, telefone do cliente e dados das reservas não entram nessas dicas. Uma transcrição vazia ou marcada como inaudível pede reenvio e preserva a seleção em andamento.
+
 Implementação baseada na [documentação oficial de transcrição da OpenAI](https://developers.openai.com/api/docs/guides/speech-to-text) e no [download de mídia documentado pelo Baileys](https://github.com/WhiskeySockets/docs/blob/main/messaging/media-messages.mdx). O SDK instalado já suporta `gpt-transcribe` e `languages`. Não foi necessário atualizar dependências.
 
 ## Subir na VPS
