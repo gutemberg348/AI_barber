@@ -51,14 +51,16 @@ test('SDK envia multipart com OGG, modelo configurado e idioma português sem in
     return Response.json({ text: 'Quero um corte com Júlio amanhã.' });
   } });
   const service = new AudioTranscriber({ config: config(), client });
-  assert.equal(await service.transcribe((await voice()).audio, download), 'Quero um corte com Júlio amanhã.');
+  assert.equal(await service.transcribe((await voice('limite-exato', { seconds: 60 })).audio, download), 'Quero um corte com Júlio amanhã.');
   assert.equal(calls, 1);
 });
 
 test('limites declarados, desativação e formato inválido impedem download e cobrança de transcrição', async () => {
   for (const [extra, media, code] of [
     [{ WHATSAPP_AUDIO_ENABLED: 'false' }, {}, 'audio_disabled'],
-    [{}, { seconds: 301 }, 'audio_too_long'],
+    [{}, { seconds: 61 }, 'audio_too_long'],
+    [{ WHATSAPP_AUDIO_MAX_SECONDS: 30 }, { seconds: 31 }, 'audio_too_long'],
+    [{}, { seconds: undefined }, 'audio_duration_unknown'],
     [{}, { fileLength: 10485761 }, 'audio_too_large'],
     [{}, { mimetype: 'application/octet-stream' }, 'audio_format'],
   ]) {

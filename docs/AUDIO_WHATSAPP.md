@@ -7,7 +7,7 @@ Usa a mesma `OPENAI_API_KEY` já configurada. A transcrição é uma chamada adi
 ```dotenv
 OPENAI_TRANSCRIPTION_MODEL=gpt-transcribe
 WHATSAPP_AUDIO_ENABLED=true
-WHATSAPP_AUDIO_MAX_SECONDS=300
+WHATSAPP_AUDIO_MAX_SECONDS=60
 WHATSAPP_AUDIO_MAX_BYTES=10485760
 ```
 
@@ -16,7 +16,7 @@ Para desligar apenas a interpretação de áudio, defina `WHATSAPP_AUDIO_ENABLED
 ## Funcionamento e limites
 
 - Mensagens passam pelos mesmos filtros de remetente, idade, deduplicação, pausa e limite por cliente antes do download. Um áudio não bloqueia conversas de outros clientes; áudio e texto do mesmo remetente seguem a ordem da fila.
-- A duração informada pelo WhatsApp é limitada a 300 segundos por padrão. O download é interrompido se os bytes reais excederem 10 MiB, mesmo que a mensagem declare um arquivo menor. Tem prazo de 20 segundos; a transcrição usa timeout de 45 segundos por tentativa e uma repetição automática do SDK para falhas transitórias.
+- O limite padrão por áudio é de 60 segundos, inclusive. O bot confere a duração informada pelo WhatsApp antes do download. Se ela faltar, for inválida ou ultrapassar o limite, o bot pede outra mensagem. Para usar 30 segundos, defina `WHATSAPP_AUDIO_MAX_SECONDS=30`. O download também é interrompido se os bytes reais excederem 10 MiB. O prazo de download é de 20 segundos. A transcrição usa timeout de 45 segundos por tentativa e uma repetição automática do SDK para falhas transitórias.
 - OGG/Opus de mensagem de voz é enviado diretamente. Também são aceitos tipos MIME de MP3, M4A/MP4, WAV, WebM e FLAC. Formato não aceito, mídia indisponível, transcrição vazia ou erro da OpenAI geram pedido curto para reenviar ou escrever, sem executar o agente com conteúdo vazio. Documentos anexados, vídeos, imagens e figurinhas continuam sem interpretação.
 - O arquivo baixado fica em memória e não é salvo em disco. Enquanto aguarda processamento, a fila guarda no SQLite criptografado apenas os metadados necessários ao download, incluindo a chave da mídia. Após a tentativa, esses metadados são removidos. Se houver sucesso, o texto reconhecido é persistido antes de chamar o agente e segue a mesma retenção do histórico escrito. A OpenAI recebe o áudio para transcrição.
 - Um reenvio da resposta já pronta não transcreve novamente. Um reinício depois de persistir a transcrição também a reutiliza. Se o processo cair enquanto a chamada externa ainda não tiver retornado/persistido, a retomada pode repetir a transcrição; não há garantia de cobrança única nesse caso.

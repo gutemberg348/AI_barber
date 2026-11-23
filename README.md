@@ -95,7 +95,7 @@ Quando o cliente pergunta se pode ir ou diz que está indo, a Luna consulta os a
 
 `/parar` pausa o bot para aquele cliente; `/voltar` retoma mantendo o histórico. Na aba **Conversas** do painel, o administrador pode [pausar e retomar a IA por número](docs/PAUSA_POR_NUMERO.md) para atender pessoalmente pelo WhatsApp. A pausa administrativa é persistente, não pode ser removida pelo cliente e invalida respostas antigas. O agente recebe texto e áudio e responde por texto. Áudios são transcritos com a mesma chave da OpenAI antes de continuar o atendimento; [configuração e limites](docs/AUDIO_WHATSAPP.md). Imagem, vídeo, documento e figurinha recebem orientação para enviar texto ou áudio. Não há transferência automática para atendente humano nem compra/uso de planos; esses pedidos são direcionados ao site.
 
-Edite [prompts/luna.md](prompts/luna.md) para mudar o jeito da Luna falar e reinicie. **Não precisa de Prompt ID nem de um GPT pronto**: as instruções são locais, e a aplicação chama a API da OpenAI. O modelo padrão é `gpt-4.1-mini`, alterável em `OPENAI_MODEL` para um modelo compatível com Responses e function calling.
+Edite [prompts/luna.md](prompts/luna.md) para mudar o jeito da Luna falar e reinicie. **Não precisa de Prompt ID nem de um GPT pronto**: as instruções são locais, e a aplicação chama a API da OpenAI. O modelo padrão é `gpt-6-luna`, alterável em `OPENAI_MODEL` para um modelo compatível com Responses e function calling.
 
 O atendimento usa o tom descontraído da equipe do dono configurado em `BARBEARIA_DONO` (padrão: `Julio`), com expressões como “meu irmão” e emojis. As listas terminam com 💈; na lista de barbeiros, cada nome também termina com 💈. Quando perguntam quem ela é, a Luna se identifica como assistente virtual da equipe. As mensagens de confirmação, cancelamento e falha também seguem esse estilo.
 
@@ -176,7 +176,7 @@ Para validar ponta a ponta: configure as duas credenciais, verifique `barbershop
 - Contrato local: [API_IA.md](docs/API_IA.md) e [openapi-ia.json](docs/openapi-ia.json).
 - [OpenAI Docs — Function calling](https://developers.openai.com/api/docs/guides/function-calling).
 - [OpenAI Docs — instruções e exemplos de respostas](https://developers.openai.com/api/docs/guides/prompt-engineering).
-- [OpenAI Docs — GPT-4.1 mini](https://developers.openai.com/api/docs/models/gpt-4.1-mini).
+- [OpenAI Docs — GPT-6 Luna](https://developers.openai.com/api/docs/models/gpt-6-luna).
 - [Baileys — conexão e persistência de autenticação](https://github.com/WhiskeySockets/baileys.wiki-site/blob/main/docs/socket/connecting.md).
 - [Baileys — quickstart e eventos de mensagens](https://github.com/WhiskeySockets/docs/blob/main/quickstart.mdx).
 

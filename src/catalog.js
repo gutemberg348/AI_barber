@@ -82,7 +82,9 @@ export function barberListReply(catalog, askChoice = true) {
 }
 
 // A lista geral usa todos os serviços retornados pelo site, sem classificação por nome.
-export function serviceListReply(catalog, barberId = null, askChoice = true) {
+export const serviceQuestions = ['Qual você quer marcar? 👊💈', 'Quais serviços você gostaria de fazer?', 'Qual opção combina com o que você procura?'];
+
+export function serviceListReply(catalog, barberId = null, askChoice = true, question = serviceQuestions[0]) {
   const blocks = [];
   for (const barber of catalog.barbeiros ?? []) {
     if (barberId !== null && barber.id !== barberId) continue;
@@ -90,6 +92,23 @@ export function serviceListReply(catalog, barberId = null, askChoice = true) {
     if (!services.length) continue;
     blocks.push(`Serviços com ${clean(barber.nome)} 💈\n\n${services.map(service => `${clean(service.nome)} — ${money(service.preco)}`).join('\n')}`);
   }
-  return blocks.length ? blocks.join('\n\n') + (askChoice ? '\n\nQual você quer marcar? 👊💈' : '')
+  return blocks.length ? blocks.join('\n\n') + (askChoice ? '\n\n' + question : '')
     : 'Não encontrei serviços cadastrados nessa consulta. Quer conferir outro profissional? 💈';
+}
+
+// Resolve uma resposta curta ao menu usando os nomes desse profissional.
+// “A partir” descreve o preço. Qualificadores como “tesoura” fazem parte da escolha.
+export function selectedMenuServices(text, barber) {
+  if (!barber || /[?]/.test(text)) return null;
+  const value = text.trim().replace(/^(?:eu )?(?:quero(?: marcar)?|vou querer)\s+/i, '').replace(/[.!]+$/, '');
+  const key = name => serviceMatchKey(normalize(name).replace(/\s+a\s*partir$/, ''));
+  const services = barber.servicos ?? [];
+  const match = name => services.filter(service => key(service.nome) === key(name));
+  const parts = value.split(/\s*(?:[+,;]|\be\b)\s*/i);
+  // “Corte + barba” pode ser tanto um combo quanto dois serviços avulsos.
+  if (parts.length > 1 && match(value).length) return null;
+  const chosen = parts.map(part => match(part));
+  if (chosen.some(options => options.length !== 1)) return null;
+  const ids = [...new Set(chosen.map(([service]) => service.id))];
+  return ids.length && ids.length <= 20 ? { barbeiro_id: barber.id, servicos: ids, data: null } : null;
 }

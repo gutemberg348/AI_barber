@@ -24,6 +24,7 @@ function recognitionContext(config, history) {
 export function audioFailureReply(error, config) {
   if (error.code === 'audio_disabled') return 'O atendimento por áudio está desativado. Pode escrever seu pedido? 💈';
   if (error.code === 'audio_too_long') return `Envie um áudio de até ${config.WHATSAPP_AUDIO_MAX_SECONDS} segundos ou escreva seu pedido. 💈`;
+  if (error.code === 'audio_duration_unknown') return 'Não consegui conferir a duração. Pode gravar uma mensagem de voz pelo WhatsApp ou escrever seu pedido?';
   if (error.code === 'audio_too_large') return 'Esse áudio é muito grande. Pode enviar um áudio menor ou escrever seu pedido? 💈';
   if (error.code === 'audio_format') return 'Não consegui ler esse formato de áudio. Pode enviar uma mensagem de voz pelo WhatsApp ou escrever? 💈';
   if (error.code === 'audio_empty') return 'Não consegui entender o áudio. Pode repetir com mais clareza ou escrever seu pedido? 💈';
@@ -41,6 +42,7 @@ export class AudioTranscriber {
     if (!c.WHATSAPP_AUDIO_ENABLED) throw failure('audio_disabled');
     if (!this.client || !download) throw failure('audio_unavailable');
     const media = audio.message.audioMessage;
+    if (!Number.isFinite(media.seconds) || media.seconds <= 0) throw failure('audio_duration_unknown');
     if (media.seconds > c.WHATSAPP_AUDIO_MAX_SECONDS) throw failure('audio_too_long');
     if (media.fileLength > c.WHATSAPP_AUDIO_MAX_BYTES) throw failure('audio_too_large');
     const mime = (media.mimetype ?? '').split(';')[0].trim().toLowerCase();

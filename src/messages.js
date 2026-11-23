@@ -2,6 +2,7 @@ import { jidNormalizedUser, normalizeMessageContent } from '@whiskeysockets/bail
 import { botEnabled } from './bot-control.js';
 import { audioFailureReply } from './audio.js';
 import { contactControl, recordContact } from './contacts.js';
+import { createHash } from 'node:crypto';
 
 export function phoneFromJid(jid) {
   if (!jid || !jid.endsWith('@s.whatsapp.net')) return null;
@@ -22,6 +23,10 @@ export async function incomingMessage(message, socket, config) {
     phone = phoneFromJid(await socket.signalRepository?.lidMapping?.getPNForLID(jid));
   }
   const text = content.conversation ?? content.extendedTextMessage?.text;
+  const quoted = content.extendedTextMessage?.contextInfo?.quotedMessage;
+  const quotedText = quoted?.conversation ?? quoted?.extendedTextMessage?.text;
+  const quotedHash = typeof quotedText === 'string' && quotedText.length <= 65536
+    ? createHash('sha256').update(quotedText).digest('hex') : undefined;
   const media = content.audioMessage || content.imageMessage || content.videoMessage || content.documentMessage || content.stickerMessage;
   if (!text && !media) return null;
   const audio = !text && content.audioMessage ? {
@@ -35,7 +40,7 @@ export async function incomingMessage(message, socket, config) {
       mimetype: content.audioMessage.mimetype, ptt: Boolean(content.audioMessage.ptt),
     } },
   } : null;
-  return { id: `${phone ?? jid}:${message.key.id}`, jid, phone, text: text ?? '', unsupported: !text && !audio, ...(audio ? { audio } : {}), createdAt: Date.now() };
+  return { id: `${phone ?? jid}:${message.key.id}`, jid, phone, text: text ?? '', unsupported: !text && !audio, ...(quotedHash ? { quotedHash } : {}), ...(audio ? { audio } : {}), createdAt: Date.now() };
 }
 
 export class MessageProcessor {
@@ -196,7 +201,7 @@ export class MessageProcessor {
           item.reply = 'Pode resumir seu pedido em até 4.000 caracteres?';
         } else {
           try {
-            const metadata = { receivedAt: item.createdAt, voiceInput: item.voiceInput === true };
+            const metadata = { receivedAt: item.createdAt, voiceInput: item.voiceInput === true, quotedHash: item.quotedHash };
             item.reply = await this.luna.reply(item.text, item.phone, metadata);
             if (metadata.scheduleQuery) item.scheduleQuery = metadata.scheduleQuery;
             if (metadata.scheduleNotice) item.scheduleNotice = metadata.scheduleNotice;
